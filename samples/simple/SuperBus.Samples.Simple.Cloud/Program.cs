@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Rebus.Config;
 using Rebus.Routing.TypeBased;
 using Rebus.Serialization.Json;
+using SuperBus.Samples.Simple.Cloud;
 using SuperBus.Samples.Simple.Cloud.Handlers;
 using SuperBus.Samples.Simple.Messages;
 
@@ -15,9 +16,13 @@ builder.Services.AddLogging(c => c.AddConsole());
 builder.Services.AddRebus(configure => configure
     .Transport(t => t.UseAzureServiceBus(sbConnectionString, "sample-simple-cloud-queue"))
     .Serialization(s => s.UseSystemTextJson())
-    .Routing(r => r.TypeBased().Map<PongMessage>("sample-simple-tenant-queue")));
+    .Routing(r => r.TypeBased()
+        .Map<PongMessage>("sample-simple-tenant-queue")
+        .Map<PushMessage>("sample-simple-tenant-queue")));
 
 builder.Services.AddRebusHandler<PingHandler>();
+
+builder.Services.AddHostedService<PushService>();
 
 var host = builder.Build();
 

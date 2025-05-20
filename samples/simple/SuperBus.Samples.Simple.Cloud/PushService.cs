@@ -2,10 +2,9 @@
 using Rebus.Bus;
 using SuperBus.Samples.Simple.Messages;
 
-namespace SuperBus.Samples.Simple.Tenant;
+namespace SuperBus.Samples.Simple.Cloud;
 
-public class BeatService(IBus bus)
-    : BackgroundService
+public class PushService(IBus bus) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -13,9 +12,9 @@ public class BeatService(IBus bus)
         while (!stoppingToken.IsCancellationRequested)
         {
             await Task.Delay(2000, stoppingToken);
-            await bus.Send(new PingMessage()
+            await bus.Send(new PushMessage()
             {
-                Message = $"Hello {i}",
+                Message = $"Push {i}",
                 Counter = i,
             });
             i++;

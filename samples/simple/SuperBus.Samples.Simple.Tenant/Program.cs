@@ -18,6 +18,7 @@ builder.Services.AddRebus(configure => configure
     .Serialization(s => s.UseSystemTextJson())
     .Routing(r => r.TypeBased().Map<PingMessage>("sample-simple-cloud-queue")));
 builder.Services.AddRebusHandler<PongHandler>();
+builder.Services.AddRebusHandler<PushHandler>();
 
 builder.Services.AddHostedService<BeatService>();
 var host = builder.Build();
