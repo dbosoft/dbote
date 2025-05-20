@@ -1,10 +1,10 @@
 services:
   service-bus:
-    container_name: "servicebus"
+    container_name: servicebus
     image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
     # pull_policy: always
     volumes:
-      - "./config/servicebus.json:/ServiceBus_Emulator/ConfigFiles/Config.json"
+      - "./dev/config/servicebus.json:/ServiceBus_Emulator/ConfigFiles/Config.json"
     ports:
       - "5672:5672"
       - "5300:5300"
@@ -15,23 +15,25 @@ services:
       #SQL_WAIT_INTERVAL: ${SQL_WAIT_INTERVAL} # Optional: Time in seconds to wait for SQL to be ready (default is 15 seconds)
     depends_on:
       - servicebus-db
-    # networks:
-    #   sb-emulator:
-    #     aliases:
-    #       - "sb-emulator"
+  
   servicebus-db:
-    container_name: "servicebus-db"
+    container_name: servicebus-db
     image: "mcr.microsoft.com/mssql/server:2022-latest"
-    # networks:
-    #   sb-emulator:
-    #     aliases:
-    #       - "servicebus-db"
     ports:
       - "1433:1433"
     environment:
       MSSQL_PID: 'Express'
       ACCEPT_EULA: Y
       MSSQL_SA_PASSWORD: "MasterPassw0rd"
+  
+  servicebus-api:
+    container_name: servicebus-api
+    build:
+      context: ./dev/asbapi
+    volumes:
+      - "./dev/config/servicebus.json:/config/config.json"
+    ports:
+      - "80:8080"
 
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite
@@ -42,24 +44,10 @@ services:
       - "10002:10002"
 
   signalr:
-    build:
-      context: ./docker
-      dockerfile: asrs-emulator.dockerfile
     container_name: signalr
+    build:
+      context: ./dev/asrs
     volumes:
-      - "./config/signalr.json:/emulator/settings.json"
+      - "./dev/config/signalr.json:/emulator/settings.json"
     ports:
       - "8888:8888"
-    # environment:
-    #   - ASPNETCORE_ENVIRONMENT=Development
-    #   - ASPNETCORE_UpstreamSettings__Templates__0__UrlTemplate=http://host.docker.internal:7071/runtime/webhooks/signalr
-    #   - ASPNETCORE_UpstreamSettings__Templates__0__EventPattern=*
-    #   - ASPNETCORE_UpstreamSettings__Templates__0__HubPattern=*
-    #   - ASPNETCORE_UpstreamSettings__Templates__0__CategoryPattern=*
-
-networks:
-  sb-emulator:
-
-volumes:
-  azurite_data:
-
