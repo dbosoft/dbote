@@ -4,7 +4,7 @@
     "Templates":
     [
       {
-        "UrlTemplate": "http://localhost:7071/runtime/webhooks/signalr",
+        "UrlTemplate": "http://host.docker.internal:7249/runtime/webhooks/signalr",
         "EventPattern": "*",
         "HubPattern": "*",
         "CategoryPattern": "*"

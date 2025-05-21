@@ -16,6 +16,9 @@ public class PushService(IBus bus) : BackgroundService
             {
                 Message = $"Push {i}",
                 Counter = i,
+            }, new Dictionary<string, string>()
+            {
+                ["superbus-tenant"] = "tenant-1",
             });
             i++;
         }

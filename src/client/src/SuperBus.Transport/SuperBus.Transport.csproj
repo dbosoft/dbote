@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Storage.Queues" Version="12.22.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.16" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.10.0" />
+    <PackageReference Include="Rebus" Version="8.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SuperBus.Transport.Abstractions\SuperBus.Transport.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

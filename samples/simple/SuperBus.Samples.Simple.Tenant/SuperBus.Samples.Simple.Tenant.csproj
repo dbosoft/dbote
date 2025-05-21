@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\client\src\SuperBus.Transport\SuperBus.Transport.csproj" />
     <ProjectReference Include="..\SuperBus.Samples.Simple.Messages\SuperBus.Samples.Simple.Messages.csproj" />
   </ItemGroup>
 
