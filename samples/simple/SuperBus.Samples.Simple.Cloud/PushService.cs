@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Rebus.Bus;
+using SuperBus.Rebus.Integration;
 using SuperBus.Samples.Simple.Messages;
 
 namespace SuperBus.Samples.Simple.Cloud;
@@ -18,7 +19,18 @@ public class PushService(IBus bus) : BackgroundService
                 Counter = i,
             }, new Dictionary<string, string>()
             {
-                ["superbus-tenant"] = "tenant-1",
+                [Headers.TenantId] = "tenant-1",
+                [Headers.AgentId] = "agent-1",
+            });
+
+            await bus.Send(new PushMessage()
+            {
+                Message = $"Push {i}",
+                Counter = i,
+            }, new Dictionary<string, string>()
+            {
+                [Headers.TenantId] = "tenant-2",
+                [Headers.AgentId] = "agent-2",
             });
             i++;
         }

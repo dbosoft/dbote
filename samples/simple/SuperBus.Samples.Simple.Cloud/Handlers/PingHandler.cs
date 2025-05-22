@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Rebus.Bus;
 using Rebus.Handlers;
+using Rebus.Pipeline;
+using SuperBus.Rebus.Integration;
 using SuperBus.Samples.Simple.Messages;
 
 namespace SuperBus.Samples.Simple.Cloud.Handlers;
@@ -22,6 +24,10 @@ public class PingHandler(
         {
             Message = $"Hello back {message.Counter}",
             Counter = message.Counter,
+        }, new Dictionary<string, string>()
+        {
+            [Headers.TenantId] = MessageContext.Current.Headers[Headers.TenantId],
+            [Headers.AgentId] = MessageContext.Current.Headers[Headers.AgentId],
         });
     }
 }

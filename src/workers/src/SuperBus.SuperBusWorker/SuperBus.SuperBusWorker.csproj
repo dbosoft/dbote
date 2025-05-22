@@ -21,5 +21,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\client\src\SuperBus.Transport.Abstractions\SuperBus.Transport.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\SuperBus.Abstractions.SignalR\SuperBus.Abstractions.SignalR.csproj" />
+    <ProjectReference Include="..\..\..\SuperBus.Rebus.Integration\SuperBus.Rebus.Integration.csproj" />
   </ItemGroup>
 </Project>

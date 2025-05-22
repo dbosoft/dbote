@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\SuperBus.Rebus.Integration\SuperBus.Rebus.Integration.csproj" />
     <ProjectReference Include="..\SuperBus.Samples.Simple.Messages\SuperBus.Samples.Simple.Messages.csproj" />
   </ItemGroup>
 
