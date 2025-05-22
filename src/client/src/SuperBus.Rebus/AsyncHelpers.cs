@@ -1,11 +1,14 @@
-﻿using System;
+﻿// Based on https://github.com/rebus-org/Rebus.AzureQueues
+// Copyright (c) 2019 Mogens Heller Grabe
+// Licensed under MIT license https://github.com/rebus-org/Rebus.AzureQueues/blob/master/LICENSE.md
+using System;
 using System.Collections.Concurrent;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 // ReSharper disable AsyncVoidLambda
 
-namespace SuperBus.Transport;
+namespace SuperBus.Rebus;
 
 static class AsyncHelpers
 {

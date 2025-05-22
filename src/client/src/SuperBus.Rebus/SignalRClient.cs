@@ -11,14 +11,18 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Rebus.Bus;
 using SuperBus.Transport.Abstractions;
-using SuperBus.Transport.Config;
+using SuperBus.Rebus.Config;
 
-namespace SuperBus.Transport;
-
+namespace SuperBus.Rebus;
+    
 internal interface ISignalRClient
 {
     Task<string> GetQueueConnection();
+
+    Task SendMessage(string queue, SuperBusMessage message);
 }
+
+// TODO handle reconnects
 
 internal class SignalRClient(
     Uri endpointUri,
@@ -51,6 +55,11 @@ internal class SignalRClient(
     {
         var queueMetadata = await _connection!.InvokeAsync<SuperBusQueueMetadata>("GetQueueMetadata");
         return queueMetadata.Connection;
+    }
+
+    public async Task SendMessage(string queue, SuperBusMessage message)
+    {
+        await _connection!.SendAsync("SendMessage", queue, message);
     }
 
     private Task<string?> GetAccessToken()

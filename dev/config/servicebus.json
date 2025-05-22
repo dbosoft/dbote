@@ -5,7 +5,7 @@
        "Name": "sbemulatorns",
        "Queues": [
          {
-           "Name": "queue.1",
+           "Name": "sample-simple-primary",
            "Properties": {
              "DeadLetteringOnMessageExpiration": false,
              "DefaultMessageTimeToLive": "PT1H",
@@ -19,7 +19,7 @@
            }
          },
          {
-           "Name": "sample-simple-cloud-queue",
+           "Name": "sample-simple-error",
            "Properties": {
              "DeadLetteringOnMessageExpiration": false,
              "DefaultMessageTimeToLive": "PT1H",
@@ -32,8 +32,8 @@
              "RequiresSession": false
            }
          },
-        {
-           "Name": "sample-simple-tenant-queue",
+         {
+           "Name": "sample-simple-tenant",
            "Properties": {
              "DeadLetteringOnMessageExpiration": false,
              "DefaultMessageTimeToLive": "PT1H",

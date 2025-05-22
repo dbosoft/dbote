@@ -14,11 +14,11 @@ const string sbConnectionString =
 HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddLogging(c => c.AddConsole());
 builder.Services.AddRebus(configure => configure
-    .Transport(t => t.UseAzureServiceBus(sbConnectionString, "sample-simple-cloud-queue"))
+    .Transport(t => t.UseAzureServiceBus(sbConnectionString, "sample-simple-primary"))
     .Serialization(s => s.UseSystemTextJson())
     .Routing(r => r.TypeBased()
-        .Map<PongMessage>("sample-simple-tenant-queue")
-        .Map<PushMessage>("sample-simple-tenant-queue")));
+        .Map<PongMessage>("sample-simple-tenant")
+        .Map<PushMessage>("sample-simple-tenant")));
 
 builder.Services.AddRebusHandler<PingHandler>();
 

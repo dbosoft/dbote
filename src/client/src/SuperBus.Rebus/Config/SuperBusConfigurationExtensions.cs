@@ -3,6 +3,8 @@ using Rebus.Logging;
 using Rebus.Threading;
 using Rebus.Time;
 using Rebus.Transport;
+using SuperBus.Rebus.Transport;
+using SuperBus.Transport;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -10,7 +12,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SuperBus.Transport.Config;
+namespace SuperBus.Rebus.Config;
 
 public static class SuperBusConfigurationExtensions
 {
@@ -20,7 +22,7 @@ public static class SuperBusConfigurationExtensions
         SuperBusCredentials credentials,
         SuperBusTransportOptions? options = null)
     {
-        var queueName = $"superbus-{credentials.TenantId}-{credentials.AgentId}";
+        var queueName = "sample-simple-tenant";
 
         Register(configurer, queueName, endpointUri, credentials, options);
     }
@@ -52,12 +54,13 @@ public static class SuperBusConfigurationExtensions
             var rebusLoggerFactory = c.Get<IRebusLoggerFactory>();
             return new SuperBusTransport(
                 queueName,
+                options,
                 signalRClient,
-                pendingMessagesIndicator);
+                pendingMessagesIndicator,
+                rebusLoggerFactory,
+                asyncTaskFactory);
         });
 
         configurer.Register(c => c.Get<SuperBusTransport>());
     }
-
 }
-

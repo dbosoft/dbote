@@ -13,6 +13,7 @@ using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using System.Text.Json;
 using Azure.Storage.Sas;
 using Microsoft.Azure.SignalR.Management;
@@ -78,7 +79,7 @@ internal class Messages(
     // TODO use %settingsName% for queue name
     [Function(nameof(ServiceBusReceivedMessageFunction))]
     public async Task ServiceBusReceivedMessageFunction(
-        [ServiceBusTrigger("sample-simple-tenant-queue", Connection = "ServiceBusConnection")] ServiceBusReceivedMessage message)
+        [ServiceBusTrigger("sample-simple-tenant", Connection = "ServiceBusConnection")] ServiceBusReceivedMessage message)
     {
         QueueClient queue = new QueueClient("UseDevelopmentStorage=true", "outbox");
         await queue.CreateAsync();
@@ -114,5 +115,30 @@ internal class Messages(
             Connection = uri.ToString(),
         };
     }
-}
 
+    [Function(nameof(SendMessage))]
+    public async Task SendMessage(
+        [SignalRTrigger("Messages", "messages", nameof(this.SendMessage), nameof(queue), nameof(message), ConnectionStringSetting = "AzureSignalRConnectionString")]
+        SignalRInvocationContext invocationContext,
+        string queue,
+        SuperBusMessage message)
+    {
+        var serviceBusConnection = Environment.GetEnvironmentVariable("ServiceBusConnection");
+        
+        await using var serviceBusClient = new ServiceBusClient(serviceBusConnection!);
+        await using var serviceBusSender = serviceBusClient.CreateSender(queue);
+
+        var serviceBusMessage = new ServiceBusMessage
+        {
+            Body = new BinaryData(message.Body),
+            ContentType = "application/json",
+        };
+
+        foreach (var header in message.Headers)
+        {
+            serviceBusMessage.ApplicationProperties.Add(header.Key, header.Value);
+        }
+
+        await serviceBusSender.SendMessageAsync(serviceBusMessage);
+    }
+}
