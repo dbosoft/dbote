@@ -1,0 +1,38 @@
+﻿using Rebus.Config;
+using Rebus.Pipeline;
+using Rebus.Pipeline.Receive;
+using Rebus.Pipeline.Send;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Rebus.AzureServiceBus.NameFormat;
+using SuperBus.Rebus.Integration.Pipeline;
+
+namespace SuperBus.Rebus.Integration;
+
+public static class SuperBusConfigurationExtensions
+{
+    /// <summary>
+    /// Enables the SuperBus multi-tenant support. All messages are required to
+    /// have tenant information in the headers.
+    /// </summary>
+    public static void EnableSuperBus(this OptionsConfigurer configurer, string queuePrefix)
+    {
+        configurer.Decorate<INameFormatter>(context =>
+        {
+            var nameFormatter = context.Get<INameFormatter>();
+            return new SuperBusNameFormatter(nameFormatter, queuePrefix);
+        });
+
+        configurer.Decorate<IPipeline>(context =>
+        {
+            var pipeline = context.Get<IPipeline>();
+
+            return new PipelineStepConcatenator(pipeline)
+                .OnReceive(new SuperBusIncomingStep(), PipelineAbsolutePosition.Front)
+                .OnSend(new SuperBusOutgoingStep(), PipelineAbsolutePosition.Front);
+        });
+    }
+}

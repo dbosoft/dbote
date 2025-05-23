@@ -38,18 +38,21 @@ services:
       "SuperBus__Tenants__0__TenantId": "tenant-a"
       "SuperBus__Tenants__0__ConnectorId": "connector-a"
       "SuperBus__Tenants__0__SigningKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDSfgIieGaVTF7RLRoo0HH/xUjg3T8jHr1RkxeRBqwy7lAGBG6Y4Pnlka0qqVARrx3TVuMHhmRSQnu1KfFgKnuA=="
-      "SuperBus__Tenants__1__TenantId": "tenant-b"
-      "SuperBus__Tenants__1__ConnectorId": "connector-a"
-      "SuperBus__Tenants__1__SigningKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcu3L06Rb7OoM5va6o+qNPtH6qCNuGoUAWTpkYUAjZCzzW8zOQSXoHY5Uk6OG9+W5f1JVOtU/SKEggSv5QQTx9A=="
+      "SuperBus__Tenants__1__TenantId": "tenant-a"
+      "SuperBus__Tenants__1__ConnectorId": "connector-b"
+      "SuperBus__Tenants__1__SigningKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEL3yIgvcG9Cyrzv1KU0pr/Rxrf4N64MEDjYLXeIYupnFXfbhAnLRyb6SGNLlnSm9YE8HIR1JQdi5fY57mS++PkA=="
+      "SuperBus__Tenants__2__TenantId": "tenant-b"
+      "SuperBus__Tenants__2__ConnectorId": "connector-a"
+      "SuperBus__Tenants__2__SigningKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcu3L06Rb7OoM5va6o+qNPtH6qCNuGoUAWTpkYUAjZCzzW8zOQSXoHY5Uk6OG9+W5f1JVOtU/SKEggSv5QQTx9A=="
       "Logging__LogLevel__Default": "Debug"
       "AzureWebJobsSecretStorageType": files
 
-  tenant-a:
+  tenant-a-connector-a:
     depends_on:
       superbus-worker:
         condition: service_healthy
     build:
-      context: ./SuperBus.Samples.Simple.Tenant
+      context: ./SuperBus.Samples.Simple.Connector
     environment:
       "SuperBus__Endpoint": "http://superbus-worker:80/api"
       "SuperBus__ConnectorId": "connector-a"
@@ -57,12 +60,25 @@ services:
       "SuperBus__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGZfhjhITuJz0BkkS3yYezLelZOm1Lhma4/owsRcj6kuhRANCAAQNJ+AiJ4ZpVMXtEtGijQcf/FSODdPyMevVGTF5EGrDLuUAYEbpjg+eWRrSqpUBGvHdNW4weGZFJCe7Up8WAqe4"
       "SuperBus__QueuePrefix": "superbus-sample-simple"
   
-  tenant-b:
+  tenant-a-connector-b:
     depends_on:
       superbus-worker:
         condition: service_healthy
     build:
-      context: ./SuperBus.Samples.Simple.Tenant
+      context: ./SuperBus.Samples.Simple.Connector
+    environment:
+      "SuperBus__Endpoint": "http://superbus-worker:80/api"
+      "SuperBus__ConnectorId": "connector-b"
+      "SuperBus__TenantId": "tenant-a"
+      "SuperBus__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwER5qy7vlJWRS8mYGVq9Xs1SiCsFEnAMZTkteXuRZyOhRANCAAQvfIiC9wb0LKvO/UpTSmv9HGt/g3rgwQONgtd4hi6mcVd9uECctHJvpIY0uWdKb1gTwchHUlB2Ll9jnuZL74+Q"
+      "SuperBus__QueuePrefix": "superbus-sample-simple"
+  
+  tenant-b-connector-a:
+    depends_on:
+      superbus-worker:
+        condition: service_healthy
+    build:
+      context: ./SuperBus.Samples.Simple.Connector
     environment:
       "SuperBus__Endpoint": "http://superbus-worker:80/api"
       "SuperBus__ConnectorId": "connector-a"

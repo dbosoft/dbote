@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace SuperBus.Rebus.Integration;
 
-public static class Headers
+public static class SuperBusHeaders
 {
     public static readonly string TenantId = "superbus-tenant-id";
 

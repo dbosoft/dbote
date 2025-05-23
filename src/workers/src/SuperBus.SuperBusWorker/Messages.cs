@@ -47,8 +47,8 @@ internal class Messages(
             IssuerSigningKeyResolver = (_, securityToken, _, _) =>
             {
                 var t = (JsonWebToken)securityToken;
-                if (!t.TryGetClaim("tenant_id", out var tidClaim)
-                    || !t.TryGetClaim("agent_id", out var cidClaim))
+                if (!t.TryGetClaim(ClaimNames.TenantId, out var tidClaim)
+                    || !t.TryGetClaim(ClaimNames.ConnectorId, out var cidClaim))
                     return [];
 
                 var tenantOptions = superBusOptions.Value.Tenants
@@ -91,11 +91,11 @@ internal class Messages(
 
     [Function(nameof(ServiceBusReceivedMessageFunction))]
     public async Task ServiceBusReceivedMessageFunction(
-        [ServiceBusTrigger("%SuperBus:QueuePrefix%-tenant", Connection = "ServiceBusConnection")]
+        [ServiceBusTrigger("%SuperBus:QueuePrefix%-connectors", Connection = "ServiceBusConnection")]
         ServiceBusReceivedMessage message)
     {
-        if (!message.ApplicationProperties.TryGetValue(Headers.TenantId, out var tenantId)
-           || !message.ApplicationProperties.TryGetValue(Headers.ConnectorId, out var connectorId))
+        if (!message.ApplicationProperties.TryGetValue(SuperBusHeaders.TenantId, out var tenantId)
+           || !message.ApplicationProperties.TryGetValue(SuperBusHeaders.ConnectorId, out var connectorId))
             // TODO fix error handling
             throw new InvalidOperationException("Missing tenant_id or agent_id in message properties.");
 
@@ -107,7 +107,7 @@ internal class Messages(
         var superBusMessage = new SuperBusMessage()
         {
             Headers = message.ApplicationProperties
-                .Where(kvp => kvp.Key != Headers.TenantId && kvp.Key != Headers.ConnectorId)
+                .Where(kvp => kvp.Key != SuperBusHeaders.TenantId && kvp.Key != SuperBusHeaders.ConnectorId)
                 .Select(kvp => new KeyValuePair<string, string>(kvp.Key, (string)kvp.Value))
                 .ToDictionary(),
             Body = message.Body.ToString(),
@@ -119,7 +119,7 @@ internal class Messages(
     }
 
     [Function(nameof(GetQueueMetadata))]
-    public Task<SuperBusQueueMetadata> GetQueueMetadata(
+    public async Task<SuperBusQueueMetadata> GetQueueMetadata(
         [SignalRTrigger("Messages", "messages", nameof(this.GetQueueMetadata), ConnectionStringSetting = "AzureSignalRConnectionString")]
         SignalRInvocationContext invocationContext)
     {
@@ -128,6 +128,7 @@ internal class Messages(
 
         var storageConnection = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
         QueueClient queue = new QueueClient(storageConnection, $"{superBusOptions.Value.QueuePrefix}-{tenantId}-{connectorId}");
+        await queue.CreateAsync();
         var uri = queue.GenerateSasUri(
             QueueSasPermissions.Read | QueueSasPermissions.Process | QueueSasPermissions.Update,
             DateTimeOffset.UtcNow.AddHours(1));
@@ -137,7 +138,7 @@ internal class Messages(
             Connection = uri.ToString(),
         };
 
-        return Task.FromResult(metaData);
+        return metaData;
     }
 
     [Function(nameof(SendMessage))]
@@ -150,7 +151,12 @@ internal class Messages(
         var serviceBusConnection = Environment.GetEnvironmentVariable("ServiceBusConnection");
         
         await using var serviceBusClient = new ServiceBusClient(serviceBusConnection!);
-        await using var serviceBusSender = serviceBusClient.CreateSender(queue);
+
+        var actualQueueNam = queue.StartsWith($"{superBusOptions.Value.QueuePrefix}-connectors-")
+            ? $"{superBusOptions.Value.QueuePrefix}-connectors"
+            : queue;
+
+        await using var serviceBusSender = serviceBusClient.CreateSender(actualQueueNam);
 
         // TODO Add whitelist for headers
 
@@ -167,8 +173,8 @@ internal class Messages(
 
         invocationContext.Claims.TryGetValue(ClaimNames.TenantId, out var tenantId);
         invocationContext.Claims.TryGetValue(ClaimNames.ConnectorId, out var connectorId);
-        serviceBusMessage.ApplicationProperties.Add(Headers.TenantId, tenantId.ToString());
-        serviceBusMessage.ApplicationProperties.Add(Headers.ConnectorId, connectorId.ToString());
+        serviceBusMessage.ApplicationProperties.Add(SuperBusHeaders.TenantId, tenantId.ToString());
+        serviceBusMessage.ApplicationProperties.Add(SuperBusHeaders.ConnectorId, connectorId.ToString());
 
         await serviceBusSender.SendMessageAsync(serviceBusMessage);
     }

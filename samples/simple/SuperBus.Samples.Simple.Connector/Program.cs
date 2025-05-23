@@ -21,7 +21,7 @@ builder.Services.AddRebus((configure, serviceProvider) =>
     return configure
         .Transport(t => t.UseSuperBus(
             new Uri(options.Endpoint),
-            $"{options.QueuePrefix}-tenant",
+            $"{options.QueuePrefix}-connectors-{options.ConnectorId}",
             new SuperBusCredentials
             {
                 ConnectorId = options.ConnectorId,

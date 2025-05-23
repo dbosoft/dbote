@@ -33,7 +33,7 @@
            }
          },
          {
-           "Name": "superbus-sample-simple-tenant",
+           "Name": "superbus-sample-simple-connectors",
            "Properties": {
              "DeadLetteringOnMessageExpiration": false,
              "DefaultMessageTimeToLive": "PT1H",

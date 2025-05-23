@@ -19,8 +19,8 @@ public class PushService(IBus bus) : BackgroundService
                 Counter = i,
             }, new Dictionary<string, string>()
             {
-                [Headers.TenantId] = "tenant-1",
-                [Headers.ConnectorId] = "agent-1",
+                [SuperBusHeaders.TenantId] = "tenant-a",
+                [SuperBusHeaders.ConnectorId] = "connector-a",
             });
 
             await bus.Send(new PushMessage()
@@ -29,8 +29,8 @@ public class PushService(IBus bus) : BackgroundService
                 Counter = i,
             }, new Dictionary<string, string>()
             {
-                [Headers.TenantId] = "tenant-2",
-                [Headers.ConnectorId] = "agent-2",
+                [SuperBusHeaders.TenantId] = "tenant-b",
+                [SuperBusHeaders.ConnectorId] = "connector-a",
             });
             i++;
         }

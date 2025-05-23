@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Rebus.Config;
 using Rebus.Routing.TypeBased;
 using Rebus.Serialization.Json;
+using SuperBus.Rebus.Integration;
 using SuperBus.Samples.Simple.Cloud;
 using SuperBus.Samples.Simple.Cloud.Handlers;
 using SuperBus.Samples.Simple.Messages;
@@ -19,12 +20,13 @@ builder.Services.AddRebus((configure, serviceProvider) =>
 {
     var options = serviceProvider.GetRequiredService<IOptions<SuperBusOptions>>().Value;
     return configure
+        .Options(o => o.EnableSuperBus(options.QueuePrefix))
         .Transport(t => t.UseAzureServiceBus(options.Connection, $"{options.QueuePrefix}-cloud"))
         .Serialization(s => s.UseSystemTextJson())
         .Logging(l => l.MicrosoftExtensionsLogging(serviceProvider.GetRequiredService<ILoggerFactory>()))
         .Routing(r => r.TypeBased()
-            .Map<PongMessage>($"{options.QueuePrefix}-tenant")
-            .Map<PushMessage>($"{options.QueuePrefix}-tenant"));
+            .Map<PongMessage>($"{options.QueuePrefix}-connectors-connector-a")
+            .Map<PushMessage>($"{options.QueuePrefix}-connectors-connector-a"));
 });
 
 builder.Services.AddRebusHandler<PingHandler>();

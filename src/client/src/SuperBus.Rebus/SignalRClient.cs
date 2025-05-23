@@ -35,6 +35,7 @@ internal class SignalRClient(
 
     public void Initialize()
     {
+        //TODO Make initial connection more reliable in case of network issues
         _connection = new HubConnectionBuilder()
             // TODO this must be URL of the Azure function with the negotiate endpoint
             .WithUrl(endpointUri, options =>
@@ -73,8 +74,9 @@ internal class SignalRClient(
 
         var claims = new[]
         {
-            new Claim("tenant_id", credentials.TenantId),
-            new Claim("agent_id", credentials.ConnectorId)
+            new Claim(ClaimNames.TenantId, credentials.TenantId),
+            new Claim(ClaimNames.ConnectorId, credentials.ConnectorId)
+            // TODO add jti claim to prevent replay attacks
         };
 
         var securityKey = new ECDsaSecurityKey(ecdsa);
@@ -88,6 +90,7 @@ internal class SignalRClient(
             SigningCredentials = signingCredentials,
             Audience = "http://localhost",
             Issuer = "http://localhost",
+            
         };
         
         var jwt = handler.CreateToken(tokenDescriptor);
