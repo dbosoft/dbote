@@ -2,6 +2,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using SuperBus.SuperBusWorker;
 
 var builder = FunctionsApplication.CreateBuilder(args);
@@ -12,6 +13,11 @@ builder.ConfigureFunctionsWebApplication();
 //    .AddApplicationInsightsTelemetryWorkerService()
 //    .ConfigureFunctionsApplicationInsights();
 
+builder.Services.AddLogging(c => c.AddSimpleConsole());
+
+builder.Services.Configure<SuperBusOptions>(builder.Configuration.GetSection("SuperBus"));
+
 builder.Services.AddServerlessHub<Messages>();
+
 
 builder.Build().Run();

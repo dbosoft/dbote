@@ -19,11 +19,10 @@ public static class SuperBusConfigurationExtensions
     public static void UseSuperBus(
         this StandardConfigurer<ITransport> configurer,
         Uri endpointUri,
+        string queueName,
         SuperBusCredentials credentials,
         SuperBusTransportOptions? options = null)
     {
-        var queueName = "sample-simple-tenant";
-
         Register(configurer, queueName, endpointUri, credentials, options);
     }
 

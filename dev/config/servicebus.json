@@ -5,7 +5,7 @@
        "Name": "sbemulatorns",
        "Queues": [
          {
-           "Name": "sample-simple-primary",
+           "Name": "superbus-sample-simple-cloud",
            "Properties": {
              "DeadLetteringOnMessageExpiration": false,
              "DefaultMessageTimeToLive": "PT1H",
@@ -19,7 +19,7 @@
            }
          },
          {
-           "Name": "sample-simple-error",
+           "Name": "superbus-sample-simple-error",
            "Properties": {
              "DeadLetteringOnMessageExpiration": false,
              "DefaultMessageTimeToLive": "PT1H",
@@ -33,7 +33,7 @@
            }
          },
          {
-           "Name": "sample-simple-tenant",
+           "Name": "superbus-sample-simple-tenant",
            "Properties": {
              "DeadLetteringOnMessageExpiration": false,
              "DefaultMessageTimeToLive": "PT1H",

@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "SuperBus.Samples.Simple.Tenant": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

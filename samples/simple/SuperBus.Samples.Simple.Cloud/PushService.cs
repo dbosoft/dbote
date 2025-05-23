@@ -12,7 +12,7 @@ public class PushService(IBus bus) : BackgroundService
         int i = 1;
         while (!stoppingToken.IsCancellationRequested)
         {
-            await Task.Delay(2000, stoppingToken);
+            await Task.Delay(5000, stoppingToken);
             await bus.Send(new PushMessage()
             {
                 Message = $"Push {i}",

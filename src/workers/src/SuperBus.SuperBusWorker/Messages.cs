@@ -5,8 +5,6 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.SignalRService;
 using Microsoft.Azure.SignalR.Management;
-using Microsoft.Extensions.Logging;
-using Microsoft.Identity.Client.Platforms.Features.DesktopOs.Kerberos;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
@@ -14,25 +12,24 @@ using SuperBus.Abstractions.SignalR;
 using SuperBus.Rebus.Integration;
 using SuperBus.Transport.Abstractions;
 using System.Net;
-using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace SuperBus.SuperBusWorker;
 
 internal class Messages(
-    IServiceProvider serviceProvider)
+    ILogger<Messages> logger,
+    IServiceProvider serviceProvider,
+    IOptions<SuperBusOptions> superBusOptions)
     : ServerlessHub<IMessages>(serviceProvider)
 {
-    private const string PublicKey =
-        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwXc4qiEaVIFztUPrEWDqAO0h8+g5p84nzUW8rKr1DlCAscbWHJuGEgdXLcTo5a0FCHH+/q4SXxxv/bE0+HnX8g==";
-
     [Function("negotiate")]
     public async Task<HttpResponseData> Negotiate(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
     {
+        logger.LogInformation("Going to validate token 1");
         if (!req.Headers.TryGetValues(HeaderNames.Authorization, out var authHeaders))
             return req.CreateResponse(HttpStatusCode.Unauthorized);
 
@@ -42,26 +39,53 @@ internal class Messages(
 
         var jwt = authHeader.Substring("Bearer ".Length);
 
-        using var ecdsa = ECDsa.Create();
-        ecdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(PublicKey), out _);
-        var securityKey = new ECDsaSecurityKey(ecdsa);
+        logger.LogInformation("Going to validate token");
 
         var handler = new JsonWebTokenHandler();
-        handler.ReadJsonWebToken(jwt);
         var validationResult = await handler.ValidateTokenAsync(jwt, new TokenValidationParameters()
         {
-            IssuerSigningKey = securityKey,
+            // TODO Fix issuer and audience
             ValidIssuer = "http://localhost",
             ValidAudience = "http://localhost",
+            IssuerSigningKeyResolver = (foo, securityToken, _, _) =>
+            {
+                logger.LogInformation("Token {Token}", foo);
+                var t = (JsonWebToken)securityToken;
+                if (!t.TryGetClaim("tenant_id", out var tidClaim)
+                    || !t.TryGetClaim("agent_id", out var aidClaim))
+                    return [];
+
+                logger.LogInformation("Claims {TenantId} {AgentId}", tidClaim.Value, aidClaim.Value);
+
+                var tenantOptions = superBusOptions.Value.Tenants
+                    .FirstOrDefault(to => to.TenantId == tidClaim.Value && to.AgentId == aidClaim.Value);
+                if (tenantOptions is null)
+                    return [];
+
+                logger.LogInformation("Found tenant {Tenant}", tenantOptions);
+
+                var ecdsa = ECDsa.Create();
+                ecdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(tenantOptions.SigningKey), out _);
+                return [new ECDsaSecurityKey(ecdsa)];
+            },
         });
 
         if (!validationResult.IsValid)
+        {
+            logger.LogInformation(validationResult.Exception, "Token validation failed");
             return req.CreateResponse(HttpStatusCode.Unauthorized);
+        }
+            
 
+        logger.LogInformation("Validation successful");
         var token = (JsonWebToken)validationResult.SecurityToken;
-        if(!token.TryGetClaim("tenant_id", out var tenantIdClaim)
-           || !token.TryGetClaim("agent_id", out var agentIdClaim))
+        if (!token.TryGetClaim("tenant_id", out var tenantIdClaim)
+            || !token.TryGetClaim("agent_id", out var agentIdClaim))
+        {
+            logger.LogInformation("Validated token is missing claims");
             return req.CreateResponse(HttpStatusCode.Unauthorized);
+        }
+            
 
         var negotiateResponse = await NegotiateAsync(new NegotiationOptions
         {
@@ -73,20 +97,23 @@ internal class Messages(
             ]
         });
         var response = req.CreateResponse();
+        logger.LogInformation("Negotiation response: {Response}", negotiateResponse.ToString());
         await response.WriteBytesAsync(negotiateResponse.ToArray());
         return response;
     }
 
-    // TODO use %settingsName% for queue name
     [Function(nameof(ServiceBusReceivedMessageFunction))]
     public async Task ServiceBusReceivedMessageFunction(
-        [ServiceBusTrigger("sample-simple-tenant", Connection = "ServiceBusConnection")] ServiceBusReceivedMessage message)
+        [ServiceBusTrigger("%SuperBus:QueuePrefix%-tenant", Connection = "ServiceBusConnection")]
+        ServiceBusReceivedMessage message)
     {
-        if(!message.ApplicationProperties.TryGetValue(Headers.TenantId, out var tenantId)
+        logger.LogInformation("Received service bus message");
+        if (!message.ApplicationProperties.TryGetValue(Headers.TenantId, out var tenantId)
            || !message.ApplicationProperties.TryGetValue(Headers.AgentId, out var agentId))
             throw new InvalidOperationException("Missing tenant_id or agent_id in message properties.");
 
-        QueueClient queue = new QueueClient("UseDevelopmentStorage=true", $"{tenantId}-{agentId}");
+        var storageConnection = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
+        QueueClient queue = new QueueClient(storageConnection, $"{superBusOptions.Value.QueuePrefix}-{tenantId}-{agentId}");
         await queue.CreateAsync();
 
         // TODO Fix performance https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/use-utf8jsonwriter#write-raw-json
@@ -112,7 +139,8 @@ internal class Messages(
         invocationContext.Claims.TryGetValue("tenant_id", out var tenantId);
         invocationContext.Claims.TryGetValue("agent_id", out var agentId);
 
-        QueueClient queue = new QueueClient("UseDevelopmentStorage=true", $"{tenantId}-{agentId}");
+        var storageConnection = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
+        QueueClient queue = new QueueClient(storageConnection, $"{superBusOptions.Value.QueuePrefix}-{tenantId}-{agentId}");
         var uri = queue.GenerateSasUri(
             QueueSasPermissions.Read | QueueSasPermissions.Process | QueueSasPermissions.Update,
             DateTimeOffset.UtcNow.AddHours(1));
