@@ -2,7 +2,7 @@
 using Rebus.Bus;
 using SuperBus.Samples.Simple.Messages;
 
-namespace SuperBus.Samples.Simple.Tenant;
+namespace SuperBus.Samples.Simple.Connector;
 
 public class BeatService(IBus bus)
     : BackgroundService

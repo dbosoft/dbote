@@ -36,10 +36,10 @@ services:
       "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
       "SuperBus__QueuePrefix": "superbus-sample-simple"
       "SuperBus__Tenants__0__TenantId": "tenant-a"
-      "SuperBus__Tenants__0__AgentId": "agent-a"
+      "SuperBus__Tenants__0__ConnectorId": "connector-a"
       "SuperBus__Tenants__0__SigningKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDSfgIieGaVTF7RLRoo0HH/xUjg3T8jHr1RkxeRBqwy7lAGBG6Y4Pnlka0qqVARrx3TVuMHhmRSQnu1KfFgKnuA=="
       "SuperBus__Tenants__1__TenantId": "tenant-b"
-      "SuperBus__Tenants__1__AgentId": "agent-b"
+      "SuperBus__Tenants__1__ConnectorId": "connector-a"
       "SuperBus__Tenants__1__SigningKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcu3L06Rb7OoM5va6o+qNPtH6qCNuGoUAWTpkYUAjZCzzW8zOQSXoHY5Uk6OG9+W5f1JVOtU/SKEggSv5QQTx9A=="
       "Logging__LogLevel__Default": "Debug"
       "AzureWebJobsSecretStorageType": files
@@ -52,7 +52,7 @@ services:
       context: ./SuperBus.Samples.Simple.Tenant
     environment:
       "SuperBus__Endpoint": "http://superbus-worker:80/api"
-      "SuperBus__AgentId": "agent-a"
+      "SuperBus__ConnectorId": "connector-a"
       "SuperBus__TenantId": "tenant-a"
       "SuperBus__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGZfhjhITuJz0BkkS3yYezLelZOm1Lhma4/owsRcj6kuhRANCAAQNJ+AiJ4ZpVMXtEtGijQcf/FSODdPyMevVGTF5EGrDLuUAYEbpjg+eWRrSqpUBGvHdNW4weGZFJCe7Up8WAqe4"
       "SuperBus__QueuePrefix": "superbus-sample-simple"
@@ -65,7 +65,7 @@ services:
       context: ./SuperBus.Samples.Simple.Tenant
     environment:
       "SuperBus__Endpoint": "http://superbus-worker:80/api"
-      "SuperBus__AgentId": "agent-b"
+      "SuperBus__ConnectorId": "connector-a"
       "SuperBus__TenantId": "tenant-b"
       "SuperBus__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgBhzsfVnKvBZjbyYxwXIIwgWqTXci9I+VIHSkO7xG7zChRANCAARy7cvTpFvs6gzm9rqj6o0+0fqoI24ahQBZOmRhQCNkLPNbzM5BJegdjlSTo4b35bl/UlU61T9IoSCBK/lBBPH0"
       "SuperBus__QueuePrefix": "superbus-sample-simple"

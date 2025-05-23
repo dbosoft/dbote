@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
 namespace SuperBus.SuperBusWorker;
 
 public class SuperBusOptions
@@ -15,7 +12,7 @@ public class SuperBusOptions
 
 public record SuperBusTenantOptions
 {
-    public string AgentId { get; set; }
+    public string ConnectorId { get; set; }
 
     public string TenantId { get; set; }
 

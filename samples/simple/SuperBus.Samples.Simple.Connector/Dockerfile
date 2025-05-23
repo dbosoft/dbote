@@ -7,4 +7,4 @@ COPY ./bin/Release/net8.0/linux-x64/publish .
 EXPOSE 8080
 USER $APP_UID
 
-ENTRYPOINT ["./SuperBus.Samples.Simple.Tenant"]
+ENTRYPOINT ["./SuperBus.Samples.Simple.Connector"]

@@ -20,7 +20,7 @@ public class PushService(IBus bus) : BackgroundService
             }, new Dictionary<string, string>()
             {
                 [Headers.TenantId] = "tenant-1",
-                [Headers.AgentId] = "agent-1",
+                [Headers.ConnectorId] = "agent-1",
             });
 
             await bus.Send(new PushMessage()
@@ -30,7 +30,7 @@ public class PushService(IBus bus) : BackgroundService
             }, new Dictionary<string, string>()
             {
                 [Headers.TenantId] = "tenant-2",
-                [Headers.AgentId] = "agent-2",
+                [Headers.ConnectorId] = "agent-2",
             });
             i++;
         }

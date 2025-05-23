@@ -10,7 +10,7 @@ public static class Headers
 {
     public static readonly string TenantId = "superbus-tenant-id";
 
-    public static readonly string AgentId = "superbus-agent-id";
+    public static readonly string ConnectorId = "superbus-connector-id";
 
     public static readonly string Signature = "superbus-signature";
 }

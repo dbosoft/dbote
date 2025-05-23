@@ -6,9 +6,9 @@ using Rebus.Config;
 using Rebus.Routing.TypeBased;
 using Rebus.Serialization.Json;
 using SuperBus.Rebus.Config;
+using SuperBus.Samples.Simple.Connector;
+using SuperBus.Samples.Simple.Connector.Handlers;
 using SuperBus.Samples.Simple.Messages;
-using SuperBus.Samples.Simple.Tenant;
-using SuperBus.Samples.Simple.Tenant.Handlers;
 
 HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 
@@ -24,7 +24,7 @@ builder.Services.AddRebus((configure, serviceProvider) =>
             $"{options.QueuePrefix}-tenant",
             new SuperBusCredentials
             {
-                AgentId = options.AgentId,
+                ConnectorId = options.ConnectorId,
                 SigningKey = options.SigningKey,
                 TenantId = options.TenantId,
             }))

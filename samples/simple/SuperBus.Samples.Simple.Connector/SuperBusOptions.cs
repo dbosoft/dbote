@@ -1,16 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace SuperBus.Samples.Simple.Tenant;
+﻿namespace SuperBus.Samples.Simple.Connector;
 
 public class SuperBusOptions
 {
     public string Endpoint { get; set; }
 
-    public string AgentId { get; set; }
+    public string ConnectorId { get; set; }
 
     public string TenantId { get; set; }
 

@@ -74,7 +74,7 @@ internal class SignalRClient(
         var claims = new[]
         {
             new Claim("tenant_id", credentials.TenantId),
-            new Claim("agent_id", credentials.AgentId)
+            new Claim("agent_id", credentials.ConnectorId)
         };
 
         var securityKey = new ECDsaSecurityKey(ecdsa);

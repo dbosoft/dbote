@@ -27,7 +27,7 @@ public class PingHandler(
         }, new Dictionary<string, string>()
         {
             [Headers.TenantId] = MessageContext.Current.Headers[Headers.TenantId],
-            [Headers.AgentId] = MessageContext.Current.Headers[Headers.AgentId],
+            [Headers.ConnectorId] = MessageContext.Current.Headers[Headers.ConnectorId],
         });
     }
 }

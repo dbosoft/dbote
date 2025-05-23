@@ -10,7 +10,7 @@ public class SuperBusCredentials
 {
     public string TenantId { get; set; }
 
-    public string AgentId { get; set; }
+    public string ConnectorId { get; set; }
 
     public string SigningKey { get; set; }
 }
