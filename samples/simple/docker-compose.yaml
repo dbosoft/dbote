@@ -1,0 +1,96 @@
+include:
+  - ../../docker-compose.yaml
+
+services:
+  cloud:
+    depends_on:
+      superbus-worker:
+        condition: service_healthy
+    build:
+      context: ./SuperBus.Samples.Simple.Cloud
+    environment:
+      "SuperBus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+      "SuperBus__QueuePrefix": "superbus-sample-simple"
+  
+  superbus-worker:
+    build:
+      context: ../../src/workers/src/SuperBus.SuperBusWorker
+    depends_on:
+      servicebus-health:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/admin/host/status?code=master-secret"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    configs:
+      - source: azfunctions-secrets
+        target: /azure-functions-host/Secrets/host.json
+    environment:
+      # Use the full Azurite connection string as we need to change the host
+      "AzureWebJobsStorage": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+      "AzureSignalRConnectionString": "Endpoint=http://signalr;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;"
+      "ServiceBusConnection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+      "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
+      "SuperBus__QueuePrefix": "superbus-sample-simple"
+      "SuperBus__Tenants__0__TenantId": "tenant-a"
+      "SuperBus__Tenants__0__AgentId": "agent-a"
+      "SuperBus__Tenants__0__SigningKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDSfgIieGaVTF7RLRoo0HH/xUjg3T8jHr1RkxeRBqwy7lAGBG6Y4Pnlka0qqVARrx3TVuMHhmRSQnu1KfFgKnuA=="
+      "SuperBus__Tenants__1__TenantId": "tenant-b"
+      "SuperBus__Tenants__1__AgentId": "agent-b"
+      "SuperBus__Tenants__1__SigningKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcu3L06Rb7OoM5va6o+qNPtH6qCNuGoUAWTpkYUAjZCzzW8zOQSXoHY5Uk6OG9+W5f1JVOtU/SKEggSv5QQTx9A=="
+      "Logging__LogLevel__Default": "Debug"
+      "AzureWebJobsSecretStorageType": files
+
+  tenant-a:
+    depends_on:
+      superbus-worker:
+        condition: service_healthy
+    build:
+      context: ./SuperBus.Samples.Simple.Tenant
+    environment:
+      "SuperBus__Endpoint": "http://superbus-worker:80/api"
+      "SuperBus__AgentId": "agent-a"
+      "SuperBus__TenantId": "tenant-a"
+      "SuperBus__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGZfhjhITuJz0BkkS3yYezLelZOm1Lhma4/owsRcj6kuhRANCAAQNJ+AiJ4ZpVMXtEtGijQcf/FSODdPyMevVGTF5EGrDLuUAYEbpjg+eWRrSqpUBGvHdNW4weGZFJCe7Up8WAqe4"
+      "SuperBus__QueuePrefix": "superbus-sample-simple"
+  
+  tenant-b:
+    depends_on:
+      superbus-worker:
+        condition: service_healthy
+    build:
+      context: ./SuperBus.Samples.Simple.Tenant
+    environment:
+      "SuperBus__Endpoint": "http://superbus-worker:80/api"
+      "SuperBus__AgentId": "agent-b"
+      "SuperBus__TenantId": "tenant-b"
+      "SuperBus__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgBhzsfVnKvBZjbyYxwXIIwgWqTXci9I+VIHSkO7xG7zChRANCAARy7cvTpFvs6gzm9rqj6o0+0fqoI24ahQBZOmRhQCNkLPNbzM5BJegdjlSTo4b35bl/UlU61T9IoSCBK/lBBPH0"
+      "SuperBus__QueuePrefix": "superbus-sample-simple"
+
+configs:
+  azfunctions-secrets:
+    content: |
+      {
+        "masterKey": {
+          "name": "master",
+          "value": "master-secret",
+          "encrypted": false
+        },
+        "functionKeys": [
+          {
+            "name": "default",
+            "value": "default-secret",
+            "encrypted": false
+          }
+        ],
+        "systemKeys": [
+          {
+            "name": "signalr_extension",
+            "value": "signalr-secret",
+            "encrypted": false
+          }
+        ],
+      }

@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "AzureSignalRConnectionString": "Endpoint=http://localhost;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;",
+    "ServiceBusConnection": "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "SuperBus__QueuePrefix": "superbus-sample-simple",
+    "SuperBus__Tenants__0__TenantId": "tenant-1",
+    "SuperBus__Tenants__0__AgentId": "agent-1",
+    "SuperBus__Tenants__0__SigningKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwXc4qiEaVIFztUPrEWDqAO0h8+g5p84nzUW8rKr1DlCAscbWHJuGEgdXLcTo5a0FCHH+/q4SXxxv/bE0+HnX8g=="
+  }
+}

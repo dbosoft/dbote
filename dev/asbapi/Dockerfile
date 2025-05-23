@@ -9,7 +9,8 @@ RUN dotnet publish -a $TARGETARCH --no-restore -o /app ServiceBusApiEmulator/Ser
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-noble
-EXPOSE 8080
+ENV ASPNETCORE_HTTP_PORTS=80
+EXPOSE 80
 WORKDIR /app
 COPY --link --from=build /app .
 USER $APP_UID

@@ -29,7 +29,6 @@ internal class Messages(
     public async Task<HttpResponseData> Negotiate(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
     {
-        logger.LogInformation("Going to validate token 1");
         if (!req.Headers.TryGetValues(HeaderNames.Authorization, out var authHeaders))
             return req.CreateResponse(HttpStatusCode.Unauthorized);
 
@@ -39,8 +38,6 @@ internal class Messages(
 
         var jwt = authHeader.Substring("Bearer ".Length);
 
-        logger.LogInformation("Going to validate token");
-
         var handler = new JsonWebTokenHandler();
         var validationResult = await handler.ValidateTokenAsync(jwt, new TokenValidationParameters()
         {
@@ -49,7 +46,6 @@ internal class Messages(
             ValidAudience = "http://localhost",
             IssuerSigningKeyResolver = (foo, securityToken, _, _) =>
             {
-                logger.LogInformation("Token {Token}", foo);
                 var t = (JsonWebToken)securityToken;
                 if (!t.TryGetClaim("tenant_id", out var tidClaim)
                     || !t.TryGetClaim("agent_id", out var aidClaim))
@@ -62,8 +58,6 @@ internal class Messages(
                 if (tenantOptions is null)
                     return [];
 
-                logger.LogInformation("Found tenant {Tenant}", tenantOptions);
-
                 var ecdsa = ECDsa.Create();
                 ecdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(tenantOptions.SigningKey), out _);
                 return [new ECDsaSecurityKey(ecdsa)];
@@ -72,20 +66,16 @@ internal class Messages(
 
         if (!validationResult.IsValid)
         {
-            logger.LogInformation(validationResult.Exception, "Token validation failed");
+            logger.LogDebug(validationResult.Exception, "Validation of client assertion token failed: ");
             return req.CreateResponse(HttpStatusCode.Unauthorized);
         }
-            
-
-        logger.LogInformation("Validation successful");
+        
         var token = (JsonWebToken)validationResult.SecurityToken;
         if (!token.TryGetClaim("tenant_id", out var tenantIdClaim)
             || !token.TryGetClaim("agent_id", out var agentIdClaim))
         {
-            logger.LogInformation("Validated token is missing claims");
             return req.CreateResponse(HttpStatusCode.Unauthorized);
         }
-            
 
         var negotiateResponse = await NegotiateAsync(new NegotiationOptions
         {
@@ -97,7 +87,6 @@ internal class Messages(
             ]
         });
         var response = req.CreateResponse();
-        logger.LogInformation("Negotiation response: {Response}", negotiateResponse.ToString());
         await response.WriteBytesAsync(negotiateResponse.ToArray());
         return response;
     }
@@ -107,13 +96,13 @@ internal class Messages(
         [ServiceBusTrigger("%SuperBus:QueuePrefix%-tenant", Connection = "ServiceBusConnection")]
         ServiceBusReceivedMessage message)
     {
-        logger.LogInformation("Received service bus message");
         if (!message.ApplicationProperties.TryGetValue(Headers.TenantId, out var tenantId)
            || !message.ApplicationProperties.TryGetValue(Headers.AgentId, out var agentId))
+            // TODO fix error handling
             throw new InvalidOperationException("Missing tenant_id or agent_id in message properties.");
 
         var storageConnection = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
-        QueueClient queue = new QueueClient(storageConnection, $"{superBusOptions.Value.QueuePrefix}-{tenantId}-{agentId}");
+        var queue = new QueueClient(storageConnection, $"{superBusOptions.Value.QueuePrefix}-{tenantId}-{agentId}");
         await queue.CreateAsync();
 
         // TODO Fix performance https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/use-utf8jsonwriter#write-raw-json
