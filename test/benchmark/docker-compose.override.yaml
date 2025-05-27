@@ -1,0 +1,22 @@
+services:
+  benchmark:
+    ports:
+    - "7312:7312"
+
+configs:
+  signalr:
+    content: |
+      {
+        "UpstreamSettings":
+        {
+          "Templates":
+          [
+            {
+              "UrlTemplate": "http://superbus-worker/runtime/webhooks/signalr?code=master-secret",
+              "EventPattern": "*",
+              "HubPattern": "*",
+              "CategoryPattern": "*"
+            }
+          ]
+        }
+      }

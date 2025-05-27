@@ -86,7 +86,10 @@ internal class Messages(
             [
                 tenantIdClaim,
                 connectorIdClaim,
-            ]
+            ],
+            // TODO Force regular reauthentication
+            // CloseOnAuthenticationExpiration = true,
+            // TokenLifetime = TimeSpan.FromHours(1),
         });
         var response = req.CreateResponse();
         await response.WriteBytesAsync(negotiateResponse.ToArray());
