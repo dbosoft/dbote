@@ -34,5 +34,16 @@ public static class SuperBusConfigurationExtensions
                 .OnReceive(new SuperBusIncomingStep(), PipelineAbsolutePosition.Front)
                 .OnSend(new SuperBusOutgoingStep(), PipelineAbsolutePosition.Front);
         });
+
+        configurer.Decorate<IPipeline>(context =>
+        {
+            var pipeline = context.Get<IPipeline>();
+
+            return new PipelineStepInjector(pipeline)
+                .OnSend(
+                    new SuperBusOutgoingConnectorStep(queuePrefix),
+                    PipelineRelativePosition.Before,
+                    typeof(SendOutgoingMessageStep));
+        });
     }
 }

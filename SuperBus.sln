@@ -51,6 +51,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuperBus.Rebus.Integration"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuperBus.Samples.Simple.Connector", "samples\simple\SuperBus.Samples.Simple.Connector\SuperBus.Samples.Simple.Connector.csproj", "{FB7D1D38-1D5C-C8C0-6A76-D3DDF9495F04}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuperBus.Integration.Abstractions", "src\SuperBus.Integration.Abstractions\SuperBus.Integration.Abstractions.csproj", "{94352C81-17F1-4C28-BE68-25C9F062AD9F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -129,6 +131,10 @@ Global
 		{FB7D1D38-1D5C-C8C0-6A76-D3DDF9495F04}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FB7D1D38-1D5C-C8C0-6A76-D3DDF9495F04}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FB7D1D38-1D5C-C8C0-6A76-D3DDF9495F04}.Release|Any CPU.Build.0 = Release|Any CPU
+		{94352C81-17F1-4C28-BE68-25C9F062AD9F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{94352C81-17F1-4C28-BE68-25C9F062AD9F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{94352C81-17F1-4C28-BE68-25C9F062AD9F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{94352C81-17F1-4C28-BE68-25C9F062AD9F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

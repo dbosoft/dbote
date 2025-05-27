@@ -11,4 +11,8 @@
     <PackageReference Include="Rebus.AzureServiceBus" Version="10.4.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SuperBus.Integration.Abstractions\SuperBus.Integration.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>

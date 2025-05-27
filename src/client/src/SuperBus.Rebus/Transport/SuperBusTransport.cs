@@ -4,6 +4,7 @@ using Azure.Storage.Queues.Models;
 using Microsoft.AspNetCore.SignalR.Client;
 using Rebus.Bus;
 using Rebus.Exceptions;
+using Rebus.Extensions;
 using Rebus.Logging;
 using Rebus.Messages;
 using Rebus.Threading;
@@ -28,6 +29,11 @@ namespace SuperBus.Rebus.Transport;
 
 internal sealed class SuperBusTransport : ITransport, IDisposable
 {
+    /// <summary>
+    /// External timeout manager address set to this magic address will be routed to the destination address specified by the <see cref="Headers.DeferredRecipient"/> header
+    /// </summary>
+    internal const string MagicDeferredMessagesAddress = "___deferred___";
+
     private readonly ILog _log;
     private readonly IAsyncTask _messageLockRenewalTask;
     // TODO is transport multithreaded?
@@ -126,9 +132,34 @@ internal sealed class SuperBusTransport : ITransport, IDisposable
             return messagesToSend;
         });
 
+
+        var headers = transportMessage.Headers;
+
+        if (destinationAddress == MagicDeferredMessagesAddress)
+        {
+            var actualDestinationAddress = transportMessage.Headers.GetValueOrNull(Headers.DeferredRecipient);
+            if(actualDestinationAddress is null)
+                throw new ArgumentException($"Message was deferred, but the '{Headers.DeferredRecipient}' header could not be found. When a message is sent 'into the future', the '{Headers.DeferredRecipient}' header must indicate which queue to deliver the message after the delay has passed, and the '{Headers.DeferredUntil}' header must indicate the earliest time of when the message must be delivered.");
+
+            if (!headers.ContainsKey(Headers.DeferredUntil))
+                throw new ArgumentException($"Message was deferred, but the '{Headers.DeferredUntil}' header could not be found. When a message is sent 'into the future', the '{Headers.DeferredRecipient}' header must indicate which queue to deliver the message after the delay has passed, and the '{Headers.DeferredUntil}' header must indicate the earliest time of when the message must be delivered.");
+            
+
+            var clonedHeaders = headers.Clone();
+            clonedHeaders.Remove(Headers.DeferredRecipient);
+
+            outgoingMessages.Enqueue((actualDestinationAddress, new SuperBusMessage()
+            {
+                Headers = clonedHeaders,
+                Body = Encoding.UTF8.GetString(transportMessage.Body),
+            }));
+
+            return Task.CompletedTask;
+        }
+
         outgoingMessages.Enqueue((destinationAddress, new SuperBusMessage()
         {
-            Headers = transportMessage.Headers.ToDictionary(),
+            Headers = transportMessage.Headers.Clone(),
             Body = Encoding.UTF8.GetString(transportMessage.Body),
         }));
 

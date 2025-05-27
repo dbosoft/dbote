@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SuperBus.SuperBusWorker;
+using SuperBus.SuperBusWorker.Converters;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
@@ -19,5 +20,6 @@ builder.Services.Configure<SuperBusOptions>(builder.Configuration.GetSection("Su
 
 builder.Services.AddServerlessHub<Messages>();
 
+builder.Services.AddSingleton<IMessageConverter, MessageConverter>();
 
 builder.Build().Run();

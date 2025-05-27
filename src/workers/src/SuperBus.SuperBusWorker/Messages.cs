@@ -16,11 +16,13 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using SuperBus.SuperBusWorker.Converters;
 
 namespace SuperBus.SuperBusWorker;
 
 internal class Messages(
     ILogger<Messages> logger,
+    IMessageConverter messageConverter,
     IServiceProvider serviceProvider,
     IOptions<SuperBusOptions> superBusOptions)
     : ServerlessHub<IMessages>(serviceProvider)
@@ -37,6 +39,8 @@ internal class Messages(
             return req.CreateResponse(HttpStatusCode.Unauthorized);
 
         var jwt = authHeader.Substring("Bearer ".Length);
+
+        // TODO Should use a proper token endpoint
 
         var handler = new JsonWebTokenHandler();
         var validationResult = await handler.ValidateTokenAsync(jwt, new TokenValidationParameters()
@@ -97,22 +101,16 @@ internal class Messages(
         if (!message.ApplicationProperties.TryGetValue(SuperBusHeaders.TenantId, out var tenantId)
            || !message.ApplicationProperties.TryGetValue(SuperBusHeaders.ConnectorId, out var connectorId))
             // TODO fix error handling
-            throw new InvalidOperationException("Missing tenant_id or agent_id in message properties.");
+            throw new InvalidOperationException("Missing tenant_id or connector_id in message properties.");
 
         var storageConnection = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
         var queue = new QueueClient(storageConnection, $"{superBusOptions.Value.QueuePrefix}-{tenantId}-{connectorId}");
         await queue.CreateAsync();
 
-        // TODO Fix performance https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/use-utf8jsonwriter#write-raw-json
-        var superBusMessage = new SuperBusMessage()
-        {
-            Headers = message.ApplicationProperties
-                .Where(kvp => kvp.Key != SuperBusHeaders.TenantId && kvp.Key != SuperBusHeaders.ConnectorId)
-                .Select(kvp => new KeyValuePair<string, string>(kvp.Key, (string)kvp.Value))
-                .ToDictionary(),
-            Body = message.Body.ToString(),
-        };
-        
+        // TODO validate headers?
+
+        var superBusMessage = messageConverter.ToSuperBus(message);
+
         var receipt = await queue.SendMessageAsync(JsonSerializer.Serialize(superBusMessage));
 
         await Clients.All.NewMessage(receipt.Value.MessageId);
@@ -152,6 +150,8 @@ internal class Messages(
         
         await using var serviceBusClient = new ServiceBusClient(serviceBusConnection!);
 
+        // TODO use common helper for handling queue names
+
         var actualQueueNam = queue.StartsWith($"{superBusOptions.Value.QueuePrefix}-connectors-")
             ? $"{superBusOptions.Value.QueuePrefix}-connectors"
             : queue;
@@ -160,16 +160,7 @@ internal class Messages(
 
         // TODO Add whitelist for headers
 
-        var serviceBusMessage = new ServiceBusMessage
-        {
-            Body = new BinaryData(message.Body),
-            ContentType = "application/json",
-        };
-
-        foreach (var header in message.Headers)
-        {
-            serviceBusMessage.ApplicationProperties.Add(header.Key, header.Value);
-        }
+        var serviceBusMessage = messageConverter.ToServiceBus(message);
 
         invocationContext.Claims.TryGetValue(ClaimNames.TenantId, out var tenantId);
         invocationContext.Claims.TryGetValue(ClaimNames.ConnectorId, out var connectorId);
