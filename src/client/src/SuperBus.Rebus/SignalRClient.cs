@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Rebus.Bus;
 using SuperBus.Transport.Abstractions;
 using SuperBus.Rebus.Config;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace SuperBus.Rebus;
     
@@ -63,39 +64,56 @@ internal class SignalRClient(
         await _connection!.SendAsync("SendMessage", queue, message);
     }
 
-    private Task<string?> GetAccessToken()
+    // TODO review
+    private async Task<string?> GetAccessToken()
     {
-        // TODO review
-        // Create a new ECDsa instance and import the private key
+        var clientId = $"{credentials.TenantId}-{credentials.ConnectorId}";
+
         using var ecdsa = ECDsa.Create();
         ecdsa.ImportPkcs8PrivateKey(Convert.FromBase64String(credentials.SigningKey), out _);
-        
-        var handler = new JsonWebTokenHandler();
-
-        var claims = new[]
-        {
-            new Claim(ClaimNames.TenantId, credentials.TenantId),
-            new Claim(ClaimNames.ConnectorId, credentials.ConnectorId)
-            // TODO add jti claim to prevent replay attacks
-        };
-
         var securityKey = new ECDsaSecurityKey(ecdsa);
         var signingCredentials = new SigningCredentials(securityKey, SecurityAlgorithms.EcdsaSha256);
 
-        // TODO define authority and audience
+        var subject = new ClaimsIdentity(
+        [
+            new Claim(JwtRegisteredClaimNames.Sub, clientId),
+            new Claim(ClaimNames.TenantId, credentials.TenantId),
+            new Claim(ClaimNames.ConnectorId, credentials.ConnectorId),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            // TODO add nbf and exp
+        ]);
+
+        var handler = new JsonWebTokenHandler();
+
         var tokenDescriptor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(claims),
+            Subject = subject,
             Expires = DateTime.UtcNow.AddMinutes(30),
             SigningCredentials = signingCredentials,
-            Audience = "http://localhost",
-            Issuer = "http://localhost",
-            
+            Audience = endpointUri.ToString(),
+            Issuer = clientId,
         };
-        
-        var jwt = handler.CreateToken(tokenDescriptor);
 
-        return Task.FromResult<string?>(jwt);
+        var jwt = handler.CreateToken(tokenDescriptor);
+        
+        var formContent = new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                [OpenIdConnectParameterNames.GrantType] = OpenIdConnectGrantTypes.ClientCredentials,
+                [OpenIdConnectParameterNames.ClientId] = $"{credentials.TenantId}-{credentials.ConnectorId}",
+                [OpenIdConnectParameterNames.ClientAssertionType] = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                [OpenIdConnectParameterNames.ClientAssertion] = jwt,
+                ["scope"] = "superbus"
+            });
+        
+        using var httpClient = new HttpClient();
+        var response = await httpClient.PostAsync(endpointUri + "/token", formContent);
+        response.EnsureSuccessStatusCode();
+
+        var responseJson = await response.Content.ReadAsStringAsync();
+        var responseMessage = new OpenIdConnectMessage(responseJson);
+
+        return responseMessage.AccessToken;
     }
 
     public void Dispose()

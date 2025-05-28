@@ -8,6 +8,8 @@
     "SuperBus__QueuePrefix": "superbus-sample-simple",
     "SuperBus__Tenants__0__TenantId": "tenant-a",
     "SuperBus__Tenants__0__ConnectorId": "connector-a",
-    "SuperBus__Tenants__0__SigningKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwXc4qiEaVIFztUPrEWDqAO0h8+g5p84nzUW8rKr1DlCAscbWHJuGEgdXLcTo5a0FCHH+/q4SXxxv/bE0+HnX8g=="
+    "SuperBus__Tenants__0__SigningKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwXc4qiEaVIFztUPrEWDqAO0h8+g5p84nzUW8rKr1DlCAscbWHJuGEgdXLcTo5a0FCHH+/q4SXxxv/bE0+HnX8g==",
+    "OpenId__Authority": "http://localhost:7249/api"
+
   }
 }

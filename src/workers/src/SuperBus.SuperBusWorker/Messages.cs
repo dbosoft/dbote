@@ -1,22 +1,27 @@
 ﻿using Azure.Messaging.ServiceBus;
 using Azure.Storage.Queues;
 using Azure.Storage.Sas;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.SignalRService;
 using Microsoft.Azure.SignalR.Management;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using SuperBus.Abstractions.SignalR;
 using SuperBus.Rebus.Integration;
+using SuperBus.SuperBusWorker.Converters;
 using SuperBus.Transport.Abstractions;
 using System.Net;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using SuperBus.SuperBusWorker.Converters;
+using Microsoft.AspNetCore.Builder;
 
 namespace SuperBus.SuperBusWorker;
 
@@ -24,9 +29,14 @@ internal class Messages(
     ILogger<Messages> logger,
     IMessageConverter messageConverter,
     IServiceProvider serviceProvider,
-    IOptions<SuperBusOptions> superBusOptions)
+    ITokenCredentialsProvider tokenCredentialsProvider,
+    IOptions<SuperBusOptions> superBusOptions,
+    IOptions<OpenIdOptions> openIdOptions)
     : ServerlessHub<IMessages>(serviceProvider)
 {
+
+
+
     [Function("negotiate")]
     public async Task<HttpResponseData> Negotiate(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
@@ -42,28 +52,13 @@ internal class Messages(
 
         // TODO Should use a proper token endpoint
 
+        var tokenCredentials = tokenCredentialsProvider.GetCredentials();
         var handler = new JsonWebTokenHandler();
         var validationResult = await handler.ValidateTokenAsync(jwt, new TokenValidationParameters()
         {
-            // TODO Fix issuer and audience
-            ValidIssuer = "http://localhost",
-            ValidAudience = "http://localhost",
-            IssuerSigningKeyResolver = (_, securityToken, _, _) =>
-            {
-                var t = (JsonWebToken)securityToken;
-                if (!t.TryGetClaim(ClaimNames.TenantId, out var tidClaim)
-                    || !t.TryGetClaim(ClaimNames.ConnectorId, out var cidClaim))
-                    return [];
-
-                var tenantOptions = superBusOptions.Value.Tenants
-                    .FirstOrDefault(to => to.TenantId == tidClaim.Value && to.ConnectorId == cidClaim.Value);
-                if (tenantOptions is null)
-                    return [];
-
-                var ecdsa = ECDsa.Create();
-                ecdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(tenantOptions.SigningKey), out _);
-                return [new ECDsaSecurityKey(ecdsa)];
-            },
+            ValidIssuer = openIdOptions.Value.Authority,
+            ValidAudience = openIdOptions.Value.Authority,
+            IssuerSigningKey = tokenCredentials.Key,
         });
 
         if (!validationResult.IsValid)
@@ -71,25 +66,28 @@ internal class Messages(
             logger.LogDebug(validationResult.Exception, "Validation of client assertion token failed: ");
             return req.CreateResponse(HttpStatusCode.Unauthorized);
         }
-        
+
         var token = (JsonWebToken)validationResult.SecurityToken;
-        if (!token.TryGetClaim(ClaimNames.TenantId, out var tenantIdClaim)
-            || !token.TryGetClaim(ClaimNames.ConnectorId, out var connectorIdClaim))
+        if (!token.TryGetValue(ClaimNames.TenantId, out string tenantId)
+            || !token.TryGetValue(ClaimNames.ConnectorId, out string connectorId)
+            || !token.TryGetValue("scope", out string scope)
+            || scope != "superbus")
         {
+            // TODO proper error handling?
             return req.CreateResponse(HttpStatusCode.Unauthorized);
         }
 
         var negotiateResponse = await NegotiateAsync(new NegotiationOptions
         {
-            UserId = $"{tenantIdClaim.Value}-{connectorIdClaim.Value}" ,
+            UserId = $"{tenantId}-{connectorId}" ,
             Claims = 
             [
-                tenantIdClaim,
-                connectorIdClaim,
+                new Claim(ClaimNames.TenantId, tenantId),
+                new Claim(ClaimNames.ConnectorId, connectorId),
             ],
-            // TODO Force regular reauthentication
-            // CloseOnAuthenticationExpiration = true,
-            // TokenLifetime = TimeSpan.FromHours(1),
+            // TODO define values
+            CloseOnAuthenticationExpiration = true,
+            TokenLifetime = TimeSpan.FromMinutes(15),
         });
         var response = req.CreateResponse();
         await response.WriteBytesAsync(negotiateResponse.ToArray());

@@ -17,9 +17,10 @@ builder.ConfigureFunctionsWebApplication();
 builder.Services.AddLogging(c => c.AddSimpleConsole());
 
 builder.Services.Configure<SuperBusOptions>(builder.Configuration.GetSection("SuperBus"));
+builder.Services.Configure<OpenIdOptions>(builder.Configuration.GetSection("OpenId"));
 
 builder.Services.AddServerlessHub<Messages>();
 
 builder.Services.AddSingleton<IMessageConverter, MessageConverter>();
-
+builder.Services.AddSingleton<ITokenCredentialsProvider, TokenCredentialsProvider>();
 builder.Build().Run();
