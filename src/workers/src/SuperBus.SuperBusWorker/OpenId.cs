@@ -1,5 +1,5 @@
-﻿using Azure.Core;
-using Microsoft.AspNetCore.Authorization.Infrastructure;
+﻿using System.Security.Claims;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
@@ -7,22 +7,18 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+using LanguageExt;
+using LanguageExt.UnsafeValueAccess;
 using SuperBus.Transport.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
+using SuperBus.Management.Persistence.Entities;
+using SuperBus.Management.Persistence.Repositories;
 
 namespace SuperBus.SuperBusWorker;
 
 public class OpenId(
     ITokenCredentialsProvider tokenCredentialsProvider,
-    IOptions<SuperBusOptions> superBusOptions,
-    IOptions<OpenIdOptions> openIdOptions)
+    IOptions<OpenIdOptions> openIdOptions,
+    IConnectorRepository connectorRepository)
 {
     // TODO use HttRequest (aspnet core integration) or HttpRequestData (azure functions integration) as parameter type
     [Function("token")]
@@ -51,13 +47,17 @@ public class OpenId(
             return new BadRequestResult();
         }
         
-        var tenantOptions = superBusOptions.Value.Tenants
-            .FirstOrDefault(to => to.TenantId == tenantId && to.ConnectorId == connectorId);
-        if (tenantOptions is null)
+        var result = await connectorRepository.GetById(tenantId, connectorId);
+        var optionalConnectorEntity = result.Match(
+            Right: r => r,
+            Left: e => e.ToException().Rethrow<Option<ConnectorEntity>>());
+        if (optionalConnectorEntity.IsNone)
             return new BadRequestResult();
 
+        var connectorEntity = optionalConnectorEntity.ValueUnsafe();
+
         var connectorEcdsa = ECDsa.Create();
-        connectorEcdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(tenantOptions.SigningKey), out _);
+        connectorEcdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(connectorEntity.PublicKey), out _);
         var connectorKey = new ECDsaSecurityKey(connectorEcdsa);
 
         var assertionTokenResult = await handler.ValidateTokenAsync(assertionToken, new TokenValidationParameters()

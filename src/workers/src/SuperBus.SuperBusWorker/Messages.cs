@@ -31,12 +31,11 @@ internal class Messages(
     IServiceProvider serviceProvider,
     ITokenCredentialsProvider tokenCredentialsProvider,
     IOptions<SuperBusOptions> superBusOptions,
-    IOptions<OpenIdOptions> openIdOptions)
+    IOptions<OpenIdOptions> openIdOptions,
+    QueueServiceClient queueServiceClient,
+    ServiceBusClient serviceBusClient)
     : ServerlessHub<IMessages>(serviceProvider)
 {
-
-
-
     [Function("negotiate")]
     public async Task<HttpResponseData> Negotiate(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
@@ -125,10 +124,9 @@ internal class Messages(
         invocationContext.Claims.TryGetValue(ClaimNames.TenantId, out var tenantId);
         invocationContext.Claims.TryGetValue(ClaimNames.ConnectorId, out var connectorId);
 
-        var storageConnection = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
-        QueueClient queue = new QueueClient(storageConnection, $"{superBusOptions.Value.QueuePrefix}-{tenantId}-{connectorId}");
-        await queue.CreateAsync();
-        var uri = queue.GenerateSasUri(
+        var queueClient = queueServiceClient.GetQueueClient($"{superBusOptions.Value.QueuePrefix}-{tenantId}-{connectorId}");
+        await queueClient.CreateAsync();
+        var uri = queueClient.GenerateSasUri(
             QueueSasPermissions.Read | QueueSasPermissions.Process | QueueSasPermissions.Update,
             DateTimeOffset.UtcNow.AddHours(1));
 
@@ -147,17 +145,12 @@ internal class Messages(
         string queue,
         SuperBusMessage message)
     {
-        var serviceBusConnection = Environment.GetEnvironmentVariable("ServiceBusConnection");
-        
-        await using var serviceBusClient = new ServiceBusClient(serviceBusConnection!);
-
         // TODO use common helper for handling queue names
-
-        var actualQueueNam = queue.StartsWith($"{superBusOptions.Value.QueuePrefix}-connectors-")
+        var actualQueueName = queue.StartsWith($"{superBusOptions.Value.QueuePrefix}-connectors-")
             ? $"{superBusOptions.Value.QueuePrefix}-connectors"
             : queue;
 
-        await using var serviceBusSender = serviceBusClient.CreateSender(actualQueueNam);
+        await using var serviceBusSender = serviceBusClient.CreateSender(actualQueueName);
 
         // TODO Add whitelist for headers
 

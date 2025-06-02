@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "ConnectorSetupTool": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

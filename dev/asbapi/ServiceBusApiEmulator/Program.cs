@@ -14,7 +14,7 @@ if (builder.Environment.IsProduction())
 if (builder.Environment.IsDevelopment())
 {
     // Add config file using the absolute path as the relative does not seem to work
-    builder.Configuration.AddJsonFile(Path.Combine(Environment.CurrentDirectory,"..", "..", "config", "servicebus.json"));
+    builder.Configuration.AddJsonFile(Path.Combine(Environment.CurrentDirectory, "..", "..", "config", "servicebus.json"));
 }
 
 builder.Services.Configure<UserConfigOptions>(builder.Configuration.GetSection("UserConfig"));

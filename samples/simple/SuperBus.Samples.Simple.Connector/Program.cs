@@ -36,6 +36,7 @@ builder.Services.AddRebusHandler<PongHandler>();
 builder.Services.AddRebusHandler<PushHandler>();
 
 builder.Services.AddHostedService<BeatService>();
+
 var host = builder.Build();
 
 await host.RunAsync();

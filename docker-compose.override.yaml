@@ -23,5 +23,7 @@ services:
       - "8888:8888"
 
 configs:
+  connectors:
+    file: ./dev/config/connectors.json
   signalr:
     file: ./dev/config/signalr.json
