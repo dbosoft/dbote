@@ -67,6 +67,8 @@ internal class SignalRClient(
     // TODO review
     private async Task<string?> GetAccessToken()
     {
+        // TODO test reauthentication
+        // TODO add logging
         var clientId = $"{credentials.TenantId}-{credentials.ConnectorId}";
 
         using var ecdsa = ECDsa.Create();

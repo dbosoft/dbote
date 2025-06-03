@@ -20,6 +20,7 @@ public abstract class WorkloadBase(BenchmarkType benchmarkType, IBus bus) : Work
 {
     public override async Task ExecuteAsync(WorkloadContext context)
     {
+        // TODO add validation of response by passing GUID
         var response = await bus.SendRequest<BenchmarkResponse>(
             new BenchmarkRequest()
             {
@@ -29,6 +30,7 @@ public abstract class WorkloadBase(BenchmarkType benchmarkType, IBus bus) : Work
             new Dictionary<string, string>()
             {
                 ["superbus-tenant-id"] = "tenant-a",
-            });
+            },
+            TimeSpan.FromMinutes(1));
     }
 }

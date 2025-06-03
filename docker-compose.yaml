@@ -70,7 +70,3 @@ services:
     configs:
       - source: signalr
         target: /emulator/settings.json
-
-configs:
-  servicebus:
-    file: ./dev/config/servicebus.json

@@ -10,5 +10,5 @@ public class SuperBusOptions
 
     public string SigningKey { get; set; }
 
-    public string QueuePrefix { get; set; }
+    public string StoragePrefix { get; set; }
 }

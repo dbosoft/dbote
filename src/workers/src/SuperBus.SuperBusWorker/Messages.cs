@@ -95,7 +95,7 @@ internal class Messages(
 
     [Function(nameof(ServiceBusReceivedMessageFunction))]
     public async Task ServiceBusReceivedMessageFunction(
-        [ServiceBusTrigger("%SuperBus:QueuePrefix%-connectors", Connection = "ServiceBusConnection")]
+        [ServiceBusTrigger("%SuperBus:StoragePrefix%-connectors", Connection = "ServiceBusConnection")]
         ServiceBusReceivedMessage message)
     {
         if (!message.ApplicationProperties.TryGetValue(SuperBusHeaders.TenantId, out var tenantId)
@@ -104,7 +104,7 @@ internal class Messages(
             throw new InvalidOperationException("Missing tenant_id or connector_id in message properties.");
 
         var storageConnection = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
-        var queue = new QueueClient(storageConnection, $"{superBusOptions.Value.QueuePrefix}-{tenantId}-{connectorId}");
+        var queue = new QueueClient(storageConnection, $"{superBusOptions.Value.StoragePrefix}-{tenantId}-{connectorId}");
         await queue.CreateAsync();
 
         // TODO validate headers?
@@ -124,7 +124,7 @@ internal class Messages(
         invocationContext.Claims.TryGetValue(ClaimNames.TenantId, out var tenantId);
         invocationContext.Claims.TryGetValue(ClaimNames.ConnectorId, out var connectorId);
 
-        var queueClient = queueServiceClient.GetQueueClient($"{superBusOptions.Value.QueuePrefix}-{tenantId}-{connectorId}");
+        var queueClient = queueServiceClient.GetQueueClient($"{superBusOptions.Value.StoragePrefix}-{tenantId}-{connectorId}");
         await queueClient.CreateAsync();
         var uri = queueClient.GenerateSasUri(
             QueueSasPermissions.Read | QueueSasPermissions.Process | QueueSasPermissions.Update,
@@ -146,8 +146,8 @@ internal class Messages(
         SuperBusMessage message)
     {
         // TODO use common helper for handling queue names
-        var actualQueueName = queue.StartsWith($"{superBusOptions.Value.QueuePrefix}-connectors-")
-            ? $"{superBusOptions.Value.QueuePrefix}-connectors"
+        var actualQueueName = queue.StartsWith($"{superBusOptions.Value.StoragePrefix}-connectors-")
+            ? $"{superBusOptions.Value.StoragePrefix}-connectors"
             : queue;
 
         await using var serviceBusSender = serviceBusClient.CreateSender(actualQueueName);

@@ -12,7 +12,7 @@ using Microsoft.Identity.Client;
 namespace SuperBus.Rebus.Integration.Pipeline;
 
 [StepDocumentation("Enforces SuperBus connector ID header")]
-internal class SuperBusOutgoingConnectorStep(string queuePrefix) : IOutgoingStep
+internal class SuperBusOutgoingConnectorStep(string storagePrefix) : IOutgoingStep
 {
     public async Task Process(OutgoingStepContext context, Func<Task> next)
     {
@@ -39,11 +39,11 @@ internal class SuperBusOutgoingConnectorStep(string queuePrefix) : IOutgoingStep
 
     private string? GetConnectorId(IList<string> destinationAddresses)
     {
-        if (destinationAddresses.Contains($"{queuePrefix}-connectors"))
+        if (destinationAddresses.Contains($"{storagePrefix}-connectors"))
             throw new InvalidOperationException("The message has the shared connector queue as its destination which is not supported. Did you setup a proper queue for the connector?");
 
         var connectorAddresses = destinationAddresses
-            .Where(address => address.StartsWith($"{queuePrefix}-connectors-"))
+            .Where(address => address.StartsWith($"{storagePrefix}-connectors-"))
             .ToList();
 
         if (connectorAddresses.Count > 1)
@@ -56,6 +56,6 @@ internal class SuperBusOutgoingConnectorStep(string queuePrefix) : IOutgoingStep
             return null;
 
         var connectorAddress = connectorAddresses.First();
-        return connectorAddress.Substring($"{queuePrefix}-connectors-".Length);
+        return connectorAddress.Substring($"{storagePrefix}-connectors-".Length);
     }
 }

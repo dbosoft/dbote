@@ -25,5 +25,7 @@ services:
 configs:
   connectors:
     file: ./dev/config/connectors.json
+  servicebus:
+    file: ./dev/config/servicebus.json
   signalr:
     file: ./dev/config/signalr.json

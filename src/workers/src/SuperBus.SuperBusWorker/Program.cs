@@ -37,6 +37,6 @@ builder.Services.AddAzureClients(clientBuilder =>
     clientBuilder.AddQueueServiceClient(builder.Configuration["AzureWebJobsStorage"]);
 });
 
-builder.Services.AddTableStorage(builder.Configuration["SuperBus:QueuePrefix"]);
+builder.Services.AddTableStorage(builder.Configuration["SuperBus:StoragePrefix"]);
 
 builder.Build().Run();

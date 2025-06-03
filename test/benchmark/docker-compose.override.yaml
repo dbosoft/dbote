@@ -1,9 +1,110 @@
 services:
+  azurite-init:
+    environment:
+      # Use the full Azurite connection string as we need to change the host
+      "StorageConnection": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+      "StoragePrefix": "superbus-benchmark"
+  
   benchmark:
     ports:
     - "7312:7312"
 
 configs:
+  connectors:
+    content: |
+      [
+        {
+          "TenantId": "tenant-a",
+          "ConnectorId": "connector-a",
+          "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDSfgIieGaVTF7RLRoo0HH/xUjg3T8jHr1RkxeRBqwy7lAGBG6Y4Pnlka0qqVARrx3TVuMHhmRSQnu1KfFgKnuA=="
+        }
+      ]
+  servicebus:
+    content: |
+      {
+        "UserConfig": {
+          "Namespaces": [
+            {
+              "Name": "sbemulatorns",
+              "Queues": [
+                {
+                  "Name": "superbus-benchmark-cloud",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "superbus-benchmark-error",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "superbus-benchmark-runner",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "superbus-benchmark-service",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "superbus-benchmark-connectors",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                }
+              ],
+            }
+          ],
+          "Logging": {
+            "Type": "File"
+          }
+        }
+      }
   signalr:
     content: |
       {

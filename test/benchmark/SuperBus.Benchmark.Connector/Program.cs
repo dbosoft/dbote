@@ -23,7 +23,7 @@ builder.Services.AddRebus((configure, serviceProvider) =>
     return configure
         .Transport(t => t.UseSuperBus(
             new Uri(options.Endpoint),
-            $"{options.QueuePrefix}-connectors-{options.ConnectorId}",
+            $"{options.StoragePrefix}-connectors-{options.ConnectorId}",
             new SuperBusCredentials
             {
                 ConnectorId = options.ConnectorId,
@@ -32,7 +32,7 @@ builder.Services.AddRebus((configure, serviceProvider) =>
             }))
         .Serialization(s => s.UseSystemTextJson())
         .Logging(l => l.MicrosoftExtensionsLogging(serviceProvider.GetRequiredService<ILoggerFactory>()))
-        .Routing(r => r.TypeBased().Map<ConnectorResponse>($"{options.QueuePrefix}-cloud"));
+        .Routing(r => r.TypeBased().Map<ConnectorResponse>($"{options.StoragePrefix}-cloud"));
 });
 
 builder.Services.AddRebusHandler<ConnectorRequestHandler>();

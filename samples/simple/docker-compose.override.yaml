@@ -1,3 +1,10 @@
+services:      
+  azurite-init:
+    environment:
+      # Use the full Azurite connection string as we need to change the host
+      "StorageConnection": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+      "StoragePrefix": "superbus-sample-simple"
+
 configs:
   connectors:
     content: |
@@ -19,6 +26,64 @@ configs:
           "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcu3L06Rb7OoM5va6o+qNPtH6qCNuGoUAWTpkYUAjZCzzW8zOQSXoHY5Uk6OG9+W5f1JVOtU/SKEggSv5QQTx9A=="
         }
       ]
+  servicebus:
+    content: |
+      {
+        "UserConfig": {
+          "Namespaces": [
+            {
+              "Name": "sbemulatorns",
+              "Queues": [
+                {
+                  "Name": "superbus-sample-simple-cloud",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "superbus-sample-simple-error",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "superbus-sample-simple-connectors",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                }
+              ],
+            }
+          ],
+          "Logging": {
+            "Type": "File"
+          }
+        }
+      }
   signalr:
     content: |
       {

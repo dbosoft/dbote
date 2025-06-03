@@ -10,7 +10,6 @@ using Rebus.Routing.TypeBased;
 using Rebus.Serialization.Json;
 using SuperBus.Benchmark.Messages;
 using SuperBus.Benchmark.Runner;
-using SuperBus.Benchmark.Service;
 using System;
 using System.Net.Sockets;
 using Microsoft.Extensions.Configuration;
@@ -33,11 +32,11 @@ builder.WorkerBuilder.ConfigureServices((context, services) =>
         var options = serviceProvider.GetRequiredService<IOptions<SuperBusOptions>>().Value;
         return configure
             .Options(o => o.EnableSynchronousRequestReply())
-            .Options(b => b.RetryStrategy(errorQueueName: $"{options.QueuePrefix}-error"))
-            .Transport(t => t.UseAzureServiceBus(options.Connection, $"{options.QueuePrefix}-runner"))
+            .Options(b => b.RetryStrategy(errorQueueName: $"{options.StoragePrefix}-error"))
+            .Transport(t => t.UseAzureServiceBus(options.Connection, $"{options.StoragePrefix}-runner"))
             .Serialization(s => s.UseSystemTextJson())
             .Routing(r => r.TypeBased()
-                .Map<BenchmarkRequest>($"{options.QueuePrefix}-cloud"));
+                .Map<BenchmarkRequest>($"{options.StoragePrefix}-cloud"));
     });
 });
 

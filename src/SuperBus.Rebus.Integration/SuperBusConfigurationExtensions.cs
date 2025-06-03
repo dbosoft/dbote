@@ -18,12 +18,12 @@ public static class SuperBusConfigurationExtensions
     /// Enables the SuperBus multi-tenant support. All messages are required to
     /// have tenant information in the headers.
     /// </summary>
-    public static void EnableSuperBus(this OptionsConfigurer configurer, string queuePrefix)
+    public static void EnableSuperBus(this OptionsConfigurer configurer, string storagePrefix)
     {
         configurer.Decorate<INameFormatter>(context =>
         {
             var nameFormatter = context.Get<INameFormatter>();
-            return new SuperBusNameFormatter(nameFormatter, queuePrefix);
+            return new SuperBusNameFormatter(nameFormatter, storagePrefix);
         });
 
         configurer.Decorate<IPipeline>(context =>
@@ -41,7 +41,7 @@ public static class SuperBusConfigurationExtensions
 
             return new PipelineStepInjector(pipeline)
                 .OnSend(
-                    new SuperBusOutgoingConnectorStep(queuePrefix),
+                    new SuperBusOutgoingConnectorStep(storagePrefix),
                     PipelineRelativePosition.Before,
                     typeof(SendOutgoingMessageStep));
         });

@@ -10,7 +10,7 @@ services:
       context: ./SuperBus.Samples.Simple.Cloud
     environment:
       "SuperBus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
-      "SuperBus__QueuePrefix": "superbus-sample-simple"
+      "SuperBus__StoragePrefix": "superbus-sample-simple"
   
   superbus-worker:
     build:
@@ -34,7 +34,8 @@ services:
       "AzureSignalRConnectionString": "Endpoint=http://signalr;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;"
       "ServiceBusConnection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
       "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
-      "SuperBus__QueuePrefix": "superbus-sample-simple"
+      "SuperBus__StoragePrefix": "superbus-sample-simple"
+      "OpenId__Authority": "http://superbus-worker/api"
       "Logging__LogLevel__Default": "Debug"
       "AzureWebJobsSecretStorageType": files
 
@@ -45,11 +46,11 @@ services:
     build:
       context: ./SuperBus.Samples.Simple.Connector
     environment:
-      "SuperBus__Endpoint": "http://superbus-worker:80/api"
+      "SuperBus__Endpoint": "http://superbus-worker/api"
       "SuperBus__ConnectorId": "connector-a"
       "SuperBus__TenantId": "tenant-a"
       "SuperBus__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGZfhjhITuJz0BkkS3yYezLelZOm1Lhma4/owsRcj6kuhRANCAAQNJ+AiJ4ZpVMXtEtGijQcf/FSODdPyMevVGTF5EGrDLuUAYEbpjg+eWRrSqpUBGvHdNW4weGZFJCe7Up8WAqe4"
-      "SuperBus__QueuePrefix": "superbus-sample-simple"
+      "SuperBus__StoragePrefix": "superbus-sample-simple"
   
   tenant-a-connector-b:
     depends_on:
@@ -58,11 +59,11 @@ services:
     build:
       context: ./SuperBus.Samples.Simple.Connector
     environment:
-      "SuperBus__Endpoint": "http://superbus-worker:80/api"
+      "SuperBus__Endpoint": "http://superbus-worker/api"
       "SuperBus__ConnectorId": "connector-b"
       "SuperBus__TenantId": "tenant-a"
       "SuperBus__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwER5qy7vlJWRS8mYGVq9Xs1SiCsFEnAMZTkteXuRZyOhRANCAAQvfIiC9wb0LKvO/UpTSmv9HGt/g3rgwQONgtd4hi6mcVd9uECctHJvpIY0uWdKb1gTwchHUlB2Ll9jnuZL74+Q"
-      "SuperBus__QueuePrefix": "superbus-sample-simple"
+      "SuperBus__StoragePrefix": "superbus-sample-simple"
   
   tenant-b-connector-a:
     depends_on:
@@ -71,11 +72,11 @@ services:
     build:
       context: ./SuperBus.Samples.Simple.Connector
     environment:
-      "SuperBus__Endpoint": "http://superbus-worker:80/api"
+      "SuperBus__Endpoint": "http://superbus-worker/api"
       "SuperBus__ConnectorId": "connector-a"
       "SuperBus__TenantId": "tenant-b"
       "SuperBus__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgBhzsfVnKvBZjbyYxwXIIwgWqTXci9I+VIHSkO7xG7zChRANCAARy7cvTpFvs6gzm9rqj6o0+0fqoI24ahQBZOmRhQCNkLPNbzM5BJegdjlSTo4b35bl/UlU61T9IoSCBK/lBBPH0"
-      "SuperBus__QueuePrefix": "superbus-sample-simple"
+      "SuperBus__StoragePrefix": "superbus-sample-simple"
 
 configs:
   azfunctions-secrets:

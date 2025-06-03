@@ -21,12 +21,12 @@ builder.Services.AddRebus((configure, serviceProvider) =>
     return configure
         //         .Options(o => o.EnableSynchronousRequestReply())
         .Options(b => b.RetryStrategy(errorQueueName: "superbus-benchmark-error"))
-        .Options(o => o.EnableSuperBus(options.QueuePrefix))
-        .Transport(t => t.UseAzureServiceBus(options.Connection, $"{options.QueuePrefix}-service"))
+        .Options(o => o.EnableSuperBus(options.StoragePrefix))
+        .Transport(t => t.UseAzureServiceBus(options.Connection, $"{options.StoragePrefix}-service"))
         .Serialization(s => s.UseSystemTextJson())
         .Logging(l => l.MicrosoftExtensionsLogging(serviceProvider.GetRequiredService<ILoggerFactory>()))
         .Routing(r => r.TypeBased()
-            .Map<ServiceResponse>($"{options.QueuePrefix}-cloud"));
+            .Map<ServiceResponse>($"{options.StoragePrefix}-cloud"));
 });
 
 builder.Services.AddRebusHandler<ServiceRequestHandler>();
