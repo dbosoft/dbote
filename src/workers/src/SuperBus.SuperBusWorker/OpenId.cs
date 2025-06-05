@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+﻿using System.Net;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +10,7 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using LanguageExt;
 using LanguageExt.UnsafeValueAccess;
+using Microsoft.Extensions.Logging;
 using SuperBus.Transport.Abstractions;
 using SuperBus.Management.Persistence.Entities;
 using SuperBus.Management.Persistence.Repositories;
@@ -18,7 +20,8 @@ namespace SuperBus.SuperBusWorker;
 public class OpenId(
     ITokenCredentialsProvider tokenCredentialsProvider,
     IOptions<OpenIdOptions> openIdOptions,
-    IConnectorRepository connectorRepository)
+    IConnectorRepository connectorRepository,
+    ILogger<OpenId> logger)
 {
     // TODO use HttRequest (aspnet core integration) or HttpRequestData (azure functions integration) as parameter type
     [Function("token")]
@@ -52,13 +55,18 @@ public class OpenId(
             Right: r => r,
             Left: e => e.ToException().Rethrow<Option<ConnectorEntity>>());
         if (optionalConnectorEntity.IsNone)
+        {
+            logger.LogWarning("Connector with tenant ID '{TenantId}' and connector ID '{ConnectorId}' not found.", tenantId, connectorId);
             return new BadRequestResult();
-
+        }
+        
         var connectorEntity = optionalConnectorEntity.ValueUnsafe();
 
         var connectorEcdsa = ECDsa.Create();
         connectorEcdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(connectorEntity.PublicKey), out _);
         var connectorKey = new ECDsaSecurityKey(connectorEcdsa);
+
+        logger.LogDebug("Expected audience: {Audience}", openIdOptions.Value.Authority);
 
         var assertionTokenResult = await handler.ValidateTokenAsync(assertionToken, new TokenValidationParameters()
         {
@@ -69,7 +77,11 @@ public class OpenId(
         });
 
         if (!assertionTokenResult.IsValid)
+        {
+            logger.LogDebug(assertionTokenResult.Exception,
+                "Validation of client assertion token for connector with tenant ID '{TenantId}' and connector ID '{ConnectorId}' failed:");
             return new BadRequestResult();
+        }
 
         var accessToken = CreateAccessToken(tenantId, connectorId);
         return new JsonResult(new Dictionary<string, object>()
@@ -105,5 +117,21 @@ public class OpenId(
         };
 
         return handler.CreateToken(tokenDescriptor);
+    }
+
+    private IActionResult CreateErrorResponse(string error, string? errorDescription = null)
+    {
+        var response = new Dictionary<string, string>
+        {
+            [OpenIdConnectParameterNames.Error] = error
+        };
+
+        if (errorDescription is not null)
+            response[OpenIdConnectParameterNames.ErrorDescription] = errorDescription;
+
+        return new JsonResult(response)
+        {
+            StatusCode = (int)HttpStatusCode.BadRequest,
+        };
     }
 }

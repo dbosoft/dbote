@@ -23,6 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\client\src\SuperBus.Connector.Authentication\SuperBus.Connector.Authentication.csproj" />
+    <ProjectReference Include="..\..\..\src\client\src\SuperBus.Connector.Options\SuperBus.Connector.Options.csproj" />
     <ProjectReference Include="..\..\..\src\client\src\SuperBus.Rebus\SuperBus.Rebus.csproj" />
     <ProjectReference Include="..\SuperBus.Benchmark.Messages\SuperBus.Benchmark.Messages.csproj" />
   </ItemGroup>

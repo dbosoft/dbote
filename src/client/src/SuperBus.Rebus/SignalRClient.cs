@@ -71,10 +71,7 @@ internal class SignalRClient(
         // TODO add logging
         var clientId = $"{credentials.TenantId}-{credentials.ConnectorId}";
 
-        using var ecdsa = ECDsa.Create();
-        ecdsa.ImportPkcs8PrivateKey(Convert.FromBase64String(credentials.SigningKey), out _);
-        var securityKey = new ECDsaSecurityKey(ecdsa);
-        var signingCredentials = new SigningCredentials(securityKey, SecurityAlgorithms.EcdsaSha256);
+        var signingCredentials = new SigningCredentials(credentials.SigningKey, SecurityAlgorithms.EcdsaSha256);
 
         var subject = new ClaimsIdentity(
         [

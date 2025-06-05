@@ -12,6 +12,7 @@
     <PackageReference Include="Dbosoft.Azure.TableStorage.Extensions" Version="1.5.0" />
     <PackageReference Include="LanguageExt.Core" Version="4.4.9" />
     <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.23.0" />
+    <PackageReference Include="Microsoft.Azure.AppConfiguration.Functions.Worker" Version="8.2.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.0.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.ApplicationInsights" Version="2.0.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="2.0.2" />
@@ -25,6 +26,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\client\src\SuperBus.Transport.Abstractions\SuperBus.Transport.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\SuperBus.Abstractions.SignalR\SuperBus.Abstractions.SignalR.csproj" />
+    <ProjectReference Include="..\..\..\SuperBus.AppConfiguration\SuperBus.AppConfiguration.csproj" />
+    <ProjectReference Include="..\..\..\SuperBus.Options\SuperBus.Options.csproj" />
     <ProjectReference Include="..\..\..\SuperBus.Rebus.Integration\SuperBus.Rebus.Integration.csproj" />
     <ProjectReference Include="..\SuperBus.Management.Persistence\SuperBus.Management.Persistence.csproj" />
   </ItemGroup>

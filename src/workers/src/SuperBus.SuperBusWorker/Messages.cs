@@ -22,6 +22,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
+using SuperBus.Options;
 
 namespace SuperBus.SuperBusWorker;
 
@@ -30,8 +31,9 @@ internal class Messages(
     IMessageConverter messageConverter,
     IServiceProvider serviceProvider,
     ITokenCredentialsProvider tokenCredentialsProvider,
-    IOptions<SuperBusOptions> superBusOptions,
+    IOptions<StorageOptions> storageOptions,
     IOptions<OpenIdOptions> openIdOptions,
+    IOptions<ServiceBusOptions> serviceBusOptions,
     QueueServiceClient queueServiceClient,
     ServiceBusClient serviceBusClient)
     : ServerlessHub<IMessages>(serviceProvider)
@@ -95,7 +97,7 @@ internal class Messages(
 
     [Function(nameof(ServiceBusReceivedMessageFunction))]
     public async Task ServiceBusReceivedMessageFunction(
-        [ServiceBusTrigger("%SuperBus:StoragePrefix%-connectors", Connection = "ServiceBusConnection")]
+        [ServiceBusTrigger("%SuperBus:Worker:ServiceBus:Queues:Connectors%", Connection = "SuperBus:Worker:ServiceBus:Connection")]
         ServiceBusReceivedMessage message)
     {
         if (!message.ApplicationProperties.TryGetValue(SuperBusHeaders.TenantId, out var tenantId)
@@ -104,7 +106,7 @@ internal class Messages(
             throw new InvalidOperationException("Missing tenant_id or connector_id in message properties.");
 
         var storageConnection = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
-        var queue = new QueueClient(storageConnection, $"{superBusOptions.Value.StoragePrefix}-{tenantId}-{connectorId}");
+        var queue = new QueueClient(storageConnection, $"{storageOptions.Value.Prefix}-{tenantId}-{connectorId}");
         await queue.CreateAsync();
 
         // TODO validate headers?
@@ -118,13 +120,17 @@ internal class Messages(
 
     [Function(nameof(GetQueueMetadata))]
     public async Task<SuperBusQueueMetadata> GetQueueMetadata(
-        [SignalRTrigger("Messages", "messages", nameof(this.GetQueueMetadata), ConnectionStringSetting = "AzureSignalRConnectionString")]
+        [SignalRTrigger(
+            "Messages",
+            "messages",
+            nameof(this.GetQueueMetadata),
+            ConnectionStringSetting = "SuperBus:Worker:SignalR:Connection")]
         SignalRInvocationContext invocationContext)
     {
         invocationContext.Claims.TryGetValue(ClaimNames.TenantId, out var tenantId);
         invocationContext.Claims.TryGetValue(ClaimNames.ConnectorId, out var connectorId);
 
-        var queueClient = queueServiceClient.GetQueueClient($"{superBusOptions.Value.StoragePrefix}-{tenantId}-{connectorId}");
+        var queueClient = queueServiceClient.GetQueueClient($"{storageOptions.Value.Prefix}-{tenantId}-{connectorId}");
         await queueClient.CreateAsync();
         var uri = queueClient.GenerateSasUri(
             QueueSasPermissions.Read | QueueSasPermissions.Process | QueueSasPermissions.Update,
@@ -140,14 +146,19 @@ internal class Messages(
 
     [Function(nameof(SendMessage))]
     public async Task SendMessage(
-        [SignalRTrigger("Messages", "messages", nameof(this.SendMessage), nameof(queue), nameof(message), ConnectionStringSetting = "AzureSignalRConnectionString")]
+        [SignalRTrigger(
+            "Messages",
+            "messages",
+            nameof(this.SendMessage),
+            nameof(queue), nameof(message),
+            ConnectionStringSetting = "SuperBus:Worker:SignalR:Connection")]
         SignalRInvocationContext invocationContext,
         string queue,
         SuperBusMessage message)
     {
         // TODO use common helper for handling queue names
-        var actualQueueName = queue.StartsWith($"{superBusOptions.Value.StoragePrefix}-connectors-")
-            ? $"{superBusOptions.Value.StoragePrefix}-connectors"
+        var actualQueueName = queue.StartsWith($"{serviceBusOptions.Value.Queues.Connectors}-")
+            ? $"{serviceBusOptions.Value.Queues.Connectors}"
             : queue;
 
         await using var serviceBusSender = serviceBusClient.CreateSender(actualQueueName);

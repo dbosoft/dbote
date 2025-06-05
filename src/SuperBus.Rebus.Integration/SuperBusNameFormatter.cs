@@ -9,14 +9,14 @@ namespace SuperBus.Rebus.Integration;
 
 public class SuperBusNameFormatter(
     INameFormatter nameFormatter,
-    string storagePrefix)
+    string connectorsQueue)
     : INameFormatter
 {
     public string FormatQueueName(string queueName)
     {
         var formattedName = nameFormatter.FormatQueueName(queueName);
-        return formattedName.StartsWith($"{storagePrefix}-connectors-")
-            ? $"{storagePrefix}-connectors"
+        return formattedName.StartsWith($"{connectorsQueue}-")
+            ? connectorsQueue
             : formattedName;
     }
 

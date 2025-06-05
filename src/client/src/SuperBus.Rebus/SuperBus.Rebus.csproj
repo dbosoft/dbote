@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\SuperBus.Connector.Authentication\SuperBus.Connector.Authentication.csproj" />
     <ProjectReference Include="..\SuperBus.Transport.Abstractions\SuperBus.Transport.Abstractions.csproj" />
   </ItemGroup>
 
