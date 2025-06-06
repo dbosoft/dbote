@@ -1,6 +1,4 @@
-﻿using Azure.Monitor.OpenTelemetry.AspNetCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,7 +19,9 @@ builder.Configuration.AddSuperBusAzureAppConfiguration();
 
 builder.Services.Configure<ServiceBusOptions>(builder.Configuration.GetSection("SuperBus:Cloud:ServiceBus"));
 
+builder.Services.AddApplicationInsightsTelemetryWorkerService();
 builder.Services.AddLogging(c => c.AddSimpleConsole());
+
 builder.Services.AddRebus((configure, serviceProvider) =>
 {
     var options = serviceProvider.GetRequiredService<IOptions<ServiceBusOptions>>().Value;
@@ -39,8 +39,6 @@ builder.Services.AddRebus((configure, serviceProvider) =>
 builder.Services.AddRebusHandler<PingHandler>();
 
 builder.Services.AddHostedService<PushService>();
-
-//builder.Services.AddOpenTelemetry().UseAzureMonitor();
 
 var host = builder.Build();
 

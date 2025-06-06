@@ -17,7 +17,9 @@ HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.Configure<SuperBusOptions>(builder.Configuration.GetSection("SuperBus:Connector"));
 
+builder.Services.AddApplicationInsightsTelemetryWorkerService();
 builder.Services.AddLogging(c => c.AddSimpleConsole());
+
 builder.Services.AddRebus((configure, serviceProvider) =>
 {
     var options = serviceProvider.GetRequiredService<IOptions<SuperBusOptions>>().Value;

@@ -21,13 +21,16 @@ services:
     environment:
       # Use the full Azurite connection string as we need to change the host
       "AzureWebJobsStorage": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;"
-      "AzureSignalRConnectionString": "Endpoint=http://signalr;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;"
-      "ServiceBusConnection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
       "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
-      "SuperBus__StoragePrefix": "superbus-benchmark"
-      "OpenId__Authority": "http://superbus-worker/api"
-      "Logging__LogLevel__Default": "Debug"
       "AzureWebJobsSecretStorageType": files
+      "SuperBus__Worker__Storage__Connection": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+      "SuperBus__Worker__Storage__Prefix": "superbus-benchmark"
+      "SuperBus__Worker__ServiceBus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+      "SuperBus__Worker__ServiceBus__Queues__Cloud": "superbus-benchmark-cloud"
+      "SuperBus__Worker__ServiceBus__Queues__Connectors": "superbus-benchmark-connectors"
+      "SuperBus__Worker__ServiceBus__Queues__Error": "superbus-benchmark-error"
+      "SuperBus__Worker__SignalR__Connection": "Endpoint=http://signalr;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;"
+      "SuperBus__Worker__OpenId__Authority": "http://superbus-worker/api"
 
   cloud:
     depends_on:
@@ -36,8 +39,11 @@ services:
     build:
       context: ./SuperBus.Benchmark.Cloud
     environment:
-      "SuperBus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
-      "SuperBus__StoragePrefix": "superbus-benchmark"
+      "SuperBus__Cloud__Servicebus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+      "SuperBus__Cloud__ServiceBus__Queues__Cloud": "superbus-benchmark-cloud"
+      "SuperBus__Cloud__ServiceBus__Queues__Connectors": "superbus-benchmark-connectors"
+      "SuperBus__Cloud__ServiceBus__Queues__Error": "superbus-benchmark-error"
+      "SuperBus__Cloud__ServiceBus__Queues__Service": "superbus-benchmark-service"
 
   connector:
     depends_on:
@@ -46,11 +52,13 @@ services:
     build:
       context: ./SuperBus.Benchmark.Connector
     environment:
-      "SuperBus__Endpoint": "http://superbus-worker/api"
-      "SuperBus__ConnectorId": "connector-a"
-      "SuperBus__TenantId": "tenant-a"
-      "SuperBus__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGZfhjhITuJz0BkkS3yYezLelZOm1Lhma4/owsRcj6kuhRANCAAQNJ+AiJ4ZpVMXtEtGijQcf/FSODdPyMevVGTF5EGrDLuUAYEbpjg+eWRrSqpUBGvHdNW4weGZFJCe7Up8WAqe4"
-      "SuperBus__StoragePrefix": "superbus-benchmark"
+      "SuperBus__Connector__Endpoint": "http://superbus-worker/api"
+      "SuperBus__Connector__ConnectorId": "connector-a"
+      "SuperBus__Connector__TenantId": "tenant-a"
+      "SuperBus__Connector__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGZfhjhITuJz0BkkS3yYezLelZOm1Lhma4/owsRcj6kuhRANCAAQNJ+AiJ4ZpVMXtEtGijQcf/FSODdPyMevVGTF5EGrDLuUAYEbpjg+eWRrSqpUBGvHdNW4weGZFJCe7Up8WAqe4"
+      "SuperBus__Connector__Queues__Cloud": "superbus-benchmark-cloud"
+      "SuperBus__Connector__Queues__Connectors": "superbus-benchmark-connectors"
+      "SuperBus__Connector__Queues__Error": "superbus-benchmark-error"
   
   service:
     depends_on:
@@ -59,18 +67,22 @@ services:
     build:
       context: ./SuperBus.Benchmark.Service
     environment:
-      "SuperBus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
-      "SuperBus__StoragePrefix": "superbus-benchmark"
+      "SuperBus__Service__ServiceBus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+      "SuperBus__Service__ServiceBus__Queues__Cloud": "superbus-benchmark-cloud"
+      "SuperBus__Service__ServiceBus__Queues__Error": "superbus-benchmark-error"
+      "SuperBus__Service__ServiceBus__Queues__Service": "superbus-benchmark-service"
 
-  benchmark:
+  runner:
     depends_on:
       superbus-worker:
         condition: service_healthy
     build:
       context: ./SuperBus.Benchmark.Runner
     environment:
-      "SuperBus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
-      "SuperBus__StoragePrefix": "superbus-benchmark"
+      "SuperBus__Runner__ServiceBus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+      "SuperBus__Runner__ServiceBus__Queues__Cloud": "superbus-benchmark-cloud"
+      "SuperBus__Runner__ServiceBus__Queues__Error": "superbus-benchmark-error"
+      "SuperBus__Runner__ServiceBus__Queues__Runner": "superbus-benchmark-runner"
 
 configs:
   azfunctions-secrets:

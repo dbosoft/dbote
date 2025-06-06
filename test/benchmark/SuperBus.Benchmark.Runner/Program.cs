@@ -13,6 +13,7 @@ using SuperBus.Benchmark.Runner;
 using System;
 using System.Net.Sockets;
 using Microsoft.Extensions.Configuration;
+using SuperBus.Options;
 
 
 var builder = DFrameApp.CreateBuilder(portWeb: 7312, portListenWorker: 7313);
@@ -26,17 +27,18 @@ builder.WorkerBuilder.ConfigureAppConfiguration((context, config) =>
 
 builder.WorkerBuilder.ConfigureServices((context, services) =>
 {
-    services.Configure<SuperBusOptions>(context.Configuration.GetSection("SuperBus"));
+    services.Configure<ServiceBusOptions>(context.Configuration.GetSection("SuperBus:Runner:ServiceBus"));
     services.AddRebus((configure, serviceProvider) =>
     {
-        var options = serviceProvider.GetRequiredService<IOptions<SuperBusOptions>>().Value;
+        var options = serviceProvider.GetRequiredService<IOptions<ServiceBusOptions>>().Value;
+        var benchmarkQueueName = context.Configuration["SuperBus:Runner:ServiceBus:Queues:Runner"];
         return configure
             .Options(o => o.EnableSynchronousRequestReply())
-            .Options(b => b.RetryStrategy(errorQueueName: $"{options.StoragePrefix}-error"))
-            .Transport(t => t.UseAzureServiceBus(options.Connection, $"{options.StoragePrefix}-runner"))
+            .Options(b => b.RetryStrategy(errorQueueName: options.Queues.Error))
+            .Transport(t => t.UseAzureServiceBus(options.Connection, benchmarkQueueName))
             .Serialization(s => s.UseSystemTextJson())
             .Routing(r => r.TypeBased()
-                .Map<BenchmarkRequest>($"{options.StoragePrefix}-cloud"));
+                .Map<BenchmarkRequest>(options.Queues.Cloud));
     });
 });
 

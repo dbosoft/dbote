@@ -19,12 +19,14 @@ builder.Configuration.AddSuperBusAzureAppConfiguration();
 
 builder.Services.Configure<ServiceBusOptions>(builder.Configuration.GetSection("SuperBus:Cloud:ServiceBus"));
 
+builder.Services.AddApplicationInsightsTelemetryWorkerService();
 builder.Services.AddLogging(c => c.AddSimpleConsole());
+
 builder.Services.AddRebus((configure, serviceProvider) =>
 {
     var options = serviceProvider.GetRequiredService<IOptions<ServiceBusOptions>>().Value;
     // TODO Use proper options
-    var serviceQueueName = builder.Configuration["SuperBus:Cloud:ServiceBus:Service"];
+    var serviceQueueName = builder.Configuration["SuperBus:Cloud:ServiceBus:Queues:Service"];
     return configure
         .Options(b => b.RetryStrategy(errorQueueName: options.Queues.Error))
         .Options(o => o.EnableSuperBus(options.Queues.Connectors))

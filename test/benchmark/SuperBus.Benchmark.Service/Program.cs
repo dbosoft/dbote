@@ -6,27 +6,34 @@ using Rebus.Config;
 using Rebus.Retry.Simple;
 using Rebus.Routing.TypeBased;
 using Rebus.Serialization.Json;
+using SuperBus.AppConfiguration;
 using SuperBus.Benchmark.Messages;
 using SuperBus.Benchmark.Service;
+using SuperBus.Options;
 using SuperBus.Rebus.Integration;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-builder.Services.Configure<SuperBusOptions>(builder.Configuration.GetSection("SuperBus"));
+builder.Configuration.AddSuperBusAzureAppConfiguration();
 
+builder.Services.Configure<ServiceBusOptions>(builder.Configuration.GetSection("SuperBus:Service:ServiceBus"));
+
+builder.Services.AddApplicationInsightsTelemetryWorkerService();
 builder.Services.AddLogging(c => c.AddSimpleConsole());
+
 builder.Services.AddRebus((configure, serviceProvider) =>
 {
-    var options = serviceProvider.GetRequiredService<IOptions<SuperBusOptions>>().Value;
+    var options = serviceProvider.GetRequiredService<IOptions<ServiceBusOptions>>().Value;
+    var serviceQueueName = builder.Configuration["SuperBus:Service:ServiceBus:Queues:Service"];
     return configure
         //         .Options(o => o.EnableSynchronousRequestReply())
-        .Options(b => b.RetryStrategy(errorQueueName: "superbus-benchmark-error"))
-        .Options(o => o.EnableSuperBus(options.StoragePrefix))
-        .Transport(t => t.UseAzureServiceBus(options.Connection, $"{options.StoragePrefix}-service"))
+        .Options(b => b.RetryStrategy(errorQueueName: options.Queues.Error))
+        .Options(o => o.EnableSuperBus(options.Queues.Connectors))
+        .Transport(t => t.UseAzureServiceBus(options.Connection, serviceQueueName))
         .Serialization(s => s.UseSystemTextJson())
         .Logging(l => l.MicrosoftExtensionsLogging(serviceProvider.GetRequiredService<ILoggerFactory>()))
         .Routing(r => r.TypeBased()
-            .Map<ServiceResponse>($"{options.StoragePrefix}-cloud"));
+            .Map<ServiceResponse>(options.Queues.Cloud));
 });
 
 builder.Services.AddRebusHandler<ServiceRequestHandler>();
