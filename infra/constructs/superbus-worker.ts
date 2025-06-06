@@ -27,7 +27,7 @@ export class SuperBusWorker extends Construct {
         });
 
         const functionStorageContainer = new StorageContainer(this, environment.formatSafeName('stc', 'func-packages'), {
-            name: environment.formatSafeName('st', 'func-packages'),
+            name: environment.formatSafeName('stc', 'func-packages'),
             storageAccountId: functionStorageAccount.id,
             containerAccessType: "private",
         });

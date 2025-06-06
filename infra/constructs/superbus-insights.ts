@@ -2,6 +2,9 @@ import { Construct } from "constructs";
 import { Environnment } from "../environment";
 import { LogAnalyticsWorkspace } from "@cdktf/provider-azurerm/lib/log-analytics-workspace";
 import { ApplicationInsights } from "@cdktf/provider-azurerm/lib/application-insights";
+import { monitorSmartDetectorAlertRule } from "@cdktf/provider-azurerm";
+import { MonitorSmartDetectorAlertRule } from "@cdktf/provider-azurerm/lib/monitor-smart-detector-alert-rule";
+import { MonitorActionGroup } from "@cdktf/provider-azurerm/lib/monitor-action-group";
 
 export class SuperBusInsights extends Construct {
 
@@ -28,6 +31,17 @@ export class SuperBusInsights extends Construct {
       applicationType: 'web',
       workspaceId: logAnalyticsWorkspace.id,
     });
+
+    // Normally, Azure automatically creates an action group when creating the Application Insights resource.
+    // This can cause issue when destroying the resources.
+    // We manually create an action group with the same name.
+    // See https://github.com/hashicorp/terraform-provider-azurerm/issues/18026.
+    // new MonitorActionGroup(this, environment.formatName('ag', 'smart-detect'), {
+    //   resourceGroupName: environment.resourceGroup,
+    //   name: 'Application Insights Smart Detection',
+    //   shortName: 'SmartDetect',
+    //   enabled: false,
+    // });
   }
 
   get connection(): string {

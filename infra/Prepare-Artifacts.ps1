@@ -23,3 +23,19 @@ Compress-Archive `
     -DestinationPath (Join-Path $artifactsPath 'SuperBus.SuperBusWorker.zip') `
     -Force
 Pop-Location
+
+Push-Location ../test/benchmark/SuperBus.Benchmark.Cloud
+dotnet publish -c Release -r linux-x64 -o (Join-Path $artifactsPath 'SuperBus.Benchmark.Cloud')
+Compress-Archive `
+    -Path "$(Join-Path $artifactsPath 'SuperBus.Benchmark.Cloud')/*" `
+    -DestinationPath (Join-Path $artifactsPath 'SuperBus.Benchmark.Cloud.zip') `
+    -Force
+Pop-Location
+
+Push-Location ../test/benchmark/SuperBus.Benchmark.Service
+dotnet publish -c Release -r linux-x64 -o (Join-Path $artifactsPath 'SuperBus.Benchmark.Service')
+Compress-Archive `
+    -Path "$(Join-Path $artifactsPath 'SuperBus.Benchmark.Service')/*" `
+    -DestinationPath (Join-Path $artifactsPath 'SuperBus.Benchmark.Service.zip') `
+    -Force
+Pop-Location

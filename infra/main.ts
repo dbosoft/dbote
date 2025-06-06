@@ -13,6 +13,7 @@ import { Environnment } from "./environment";
 import { SuperBusWorker } from "./constructs/superbus-worker";
 import { StorageTable } from "@cdktf/provider-azurerm/lib/storage-table";
 import { StorageTableEntity } from "@cdktf/provider-azurerm/lib/storage-table-entity";
+import { SuperBusBenchmark } from "./constructs/superbus-benchmark";
 
 const location = "westeurope"; // Define the location for resources
 const resourceGroupName = "rg-superbus-test"; // Define the resource group name
@@ -37,7 +38,8 @@ class SuperBusStack extends TerraformStack {
       features: [
         {
           appConfiguration: [{ purgeSoftDeleteOnDestroy: false, recoverSoftDeleted: true }],
-        }
+          applicationInsights: [{ disableGeneratedRule: true }]
+        },
       ],
     });
 
@@ -45,15 +47,15 @@ class SuperBusStack extends TerraformStack {
 
     const insights = new SuperBusInsights(this, environment);
 
-    const appConfiguration = new AppConfiguration(this, environment.formatName('appcs', '3'), {
-      name: environment.formatName('appcs', '3'),
+    const appConfiguration = new AppConfiguration(this, environment.formatName('appcs'), {
+      name: environment.formatName('appcs'),
       location: location,
       resourceGroupName: resourceGroupName,
-      sku: 'free',
-
+      sku: 'developer',
     });
 
     const worker = new SuperBusWorker(this, environment, appConfiguration.endpoint, insights.connection);
+    const benchmark = new SuperBusBenchmark(this, environment, appConfiguration.endpoint, insights.connection);
 
     // Service Bus
     const serviceBusNamespaceName = formatName('sbns', 'superbus', 'cmdev', false);
@@ -61,12 +63,11 @@ class SuperBusStack extends TerraformStack {
       location,
       resourceGroupName,
       name: serviceBusNamespaceName,
-      sku: 'Standard',
+      sku: 'Basic',
     });
 
     const cloudQueue = new ServicebusQueue(this, environment.formatName('sbq', 'cloud'), {
       namespaceId: serviceBusNamespace.id,
-      // TODO fix name after fixing naming scheme in code
       name: environment.formatName('sbq', 'cloud'),
     });
 
@@ -121,6 +122,7 @@ class SuperBusStack extends TerraformStack {
       accountReplicationType: "LRS",
     });
 
+    /*
     const table = new StorageTable(this, environment.formatName('stt'), {
       storageAccountName: storageAccount.name,
       name: 'superbus',
@@ -134,6 +136,7 @@ class SuperBusStack extends TerraformStack {
         'SigningKey': ''
       }
     });
+    */
 
     // role assignments - worker
     new RoleAssignment(this, environment.formatName('role', 'func-sbns'), {
@@ -171,30 +174,35 @@ class SuperBusStack extends TerraformStack {
       configurationStoreId: appConfiguration.id,
       key: 'SuperBus:Worker:Storage:Connection',
       value: storageAccount.primaryConnectionString,
+      label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-connection'), {
       configurationStoreId: appConfiguration.id,
       key: 'SuperBus:Worker:ServiceBus:Connection',
       value: `Endpoint=sb://${serviceBusNamespace.name}.servicebus.windows.net/`,
+      label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-queue-cloud'), {
       configurationStoreId: appConfiguration.id,
       key: 'SuperBus:Worker:ServiceBus:Queues:Cloud',
       value: cloudQueue.name,
+      label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-queue-connectors'), {
       configurationStoreId: appConfiguration.id,
       key: 'SuperBus:Worker:ServiceBus:Queues:Connectors',
       value: connectorsQueue.name,
+      label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-queue-error'), {
       configurationStoreId: appConfiguration.id,
       key: 'SuperBus:Worker:ServiceBus:Queues:Error',
       value: errorQueue.name,
+      label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-signalr-connection'), {
@@ -202,12 +210,107 @@ class SuperBusStack extends TerraformStack {
       key: 'SuperBus:Worker:SignalR:Connection',
       // TODO use connection string instead?
       value: `Endpoint=${signalrService.hostname};Version=1.0;`,
+      label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-openid-authority'), {
       configurationStoreId: appConfiguration.id,
       key: 'SuperBus:Worker:OpenId:Authority',
       value: worker.superBusEndpoint,
+      label: environment.environment,
+    });
+
+
+    // role assignments - benchmark cloud
+    new RoleAssignment(this, environment.formatName('role', 'app-cloud-sbns'), {
+      scope: serviceBusNamespace.id,
+      roleDefinitionName: 'Azure Service Bus Data Owner',
+      principalId: benchmark.cloudPrincipalId,
+    });
+
+    new RoleAssignment(this, environment.formatName('role', 'app-cloud-appcs'), {
+      scope: appConfiguration.id,
+      roleDefinitionName: 'Azure Configuration Data Reader',
+      principalId: benchmark.cloudPrincipalId,
+    });
+
+
+    // app config - benchmark cloud
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-connection'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Cloud:ServiceBus:Connection',
+      value: `Endpoint=sb://${serviceBusNamespace.name}.servicebus.windows.net/`,
+      label: environment.environment,
+    });
+
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-cloud'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Cloud:ServiceBus:Queues:Cloud',
+      value: cloudQueue.name,
+      label: environment.environment,
+    });
+
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-connectors'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Cloud:ServiceBus:Queues:Connectors',
+      value: connectorsQueue.name,
+      label: environment.environment,
+    });
+
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-error'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Cloud:ServiceBus:Queues:Error',
+      value: errorQueue.name,
+      label: environment.environment,
+    });
+
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-service'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Cloud:ServiceBus:Queues:Service',
+      value: serviceQueue.name,
+      label: environment.environment,
+    });
+
+    // role assignments - benchmark service
+    new RoleAssignment(this, environment.formatName('role', 'app-service-sbns'), {
+      scope: serviceBusNamespace.id,
+      roleDefinitionName: 'Azure Service Bus Data Owner',
+      principalId: benchmark.servicePrincipalId,
+    });
+
+    new RoleAssignment(this, environment.formatName('role', 'app-service-appcs'), {
+      scope: appConfiguration.id,
+      roleDefinitionName: 'Azure Configuration Data Reader',
+      principalId: benchmark.servicePrincipalId,
+    });
+
+    // app config - benchmark service
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-connection'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Service:ServiceBus:Connection',
+      value: `Endpoint=sb://${serviceBusNamespace.name}.servicebus.windows.net/`,
+      label: environment.environment,
+    });
+
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-queue-cloud'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Service:ServiceBus:Queues:Cloud',
+      value: cloudQueue.name,
+      label: environment.environment,
+    });
+
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-queue-error'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Service:ServiceBus:Queues:Error',
+      value: errorQueue.name,
+      label: environment.environment,
+    });
+
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-queue-service'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Service:ServiceBus:Queues:Service',
+      value: serviceQueue.name,
+      label: environment.environment,
     });
   }
 }
