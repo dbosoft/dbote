@@ -19,20 +19,6 @@
             }
           },
           {
-            "Name": "superbus-dev-error",
-            "Properties": {
-              "DeadLetteringOnMessageExpiration": false,
-              "DefaultMessageTimeToLive": "PT1H",
-              "DuplicateDetectionHistoryTimeWindow": "PT20S",
-              "ForwardDeadLetteredMessagesTo": "",
-              "ForwardTo": "",
-              "LockDuration": "PT1M",
-              "MaxDeliveryCount": 3,
-              "RequiresDuplicateDetection": false,
-              "RequiresSession": false
-            }
-          },
-          {
             "Name": "superbus-dev-connectors",
             "Properties": {
               "DeadLetteringOnMessageExpiration": false,
@@ -47,7 +33,7 @@
             }
           },
           {
-            "Name": "superbus-sample-simple-cloud",
+            "Name": "superbus-dev-error",
             "Properties": {
               "DeadLetteringOnMessageExpiration": false,
               "DefaultMessageTimeToLive": "PT1H",
@@ -61,7 +47,7 @@
             }
           },
           {
-            "Name": "superbus-sample-simple-error",
+            "Name": "superbus-dev-runner",
             "Properties": {
               "DeadLetteringOnMessageExpiration": false,
               "DefaultMessageTimeToLive": "PT1H",
@@ -75,77 +61,7 @@
             }
           },
           {
-            "Name": "superbus-sample-simple-connectors",
-            "Properties": {
-              "DeadLetteringOnMessageExpiration": false,
-              "DefaultMessageTimeToLive": "PT1H",
-              "DuplicateDetectionHistoryTimeWindow": "PT20S",
-              "ForwardDeadLetteredMessagesTo": "",
-              "ForwardTo": "",
-              "LockDuration": "PT1M",
-              "MaxDeliveryCount": 3,
-              "RequiresDuplicateDetection": false,
-              "RequiresSession": false
-            }
-          },
-          {
-            "Name": "superbus-benchmark-runner",
-            "Properties": {
-              "DeadLetteringOnMessageExpiration": false,
-              "DefaultMessageTimeToLive": "PT1H",
-              "DuplicateDetectionHistoryTimeWindow": "PT20S",
-              "ForwardDeadLetteredMessagesTo": "",
-              "ForwardTo": "",
-              "LockDuration": "PT1M",
-              "MaxDeliveryCount": 3,
-              "RequiresDuplicateDetection": false,
-              "RequiresSession": false
-            }
-          },
-          {
-            "Name": "superbus-benchmark-cloud",
-            "Properties": {
-              "DeadLetteringOnMessageExpiration": false,
-              "DefaultMessageTimeToLive": "PT1H",
-              "DuplicateDetectionHistoryTimeWindow": "PT20S",
-              "ForwardDeadLetteredMessagesTo": "",
-              "ForwardTo": "",
-              "LockDuration": "PT1M",
-              "MaxDeliveryCount": 3,
-              "RequiresDuplicateDetection": false,
-              "RequiresSession": false
-            }
-          },
-          {
-            "Name": "superbus-benchmark-error",
-            "Properties": {
-              "DeadLetteringOnMessageExpiration": false,
-              "DefaultMessageTimeToLive": "PT1H",
-              "DuplicateDetectionHistoryTimeWindow": "PT20S",
-              "ForwardDeadLetteredMessagesTo": "",
-              "ForwardTo": "",
-              "LockDuration": "PT1M",
-              "MaxDeliveryCount": 3,
-              "RequiresDuplicateDetection": false,
-              "RequiresSession": false
-            }
-          },
-          {
-            "Name": "superbus-benchmark-connectors",
-            "Properties": {
-              "DeadLetteringOnMessageExpiration": false,
-              "DefaultMessageTimeToLive": "PT1H",
-              "DuplicateDetectionHistoryTimeWindow": "PT20S",
-              "ForwardDeadLetteredMessagesTo": "",
-              "ForwardTo": "",
-              "LockDuration": "PT1M",
-              "MaxDeliveryCount": 3,
-              "RequiresDuplicateDetection": false,
-              "RequiresSession": false
-            }
-          },
-          {
-            "Name": "superbus-benchmark-service",
+            "Name": "superbus-dev-service",
             "Properties": {
               "DeadLetteringOnMessageExpiration": false,
               "DefaultMessageTimeToLive": "PT1H",

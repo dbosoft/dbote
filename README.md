@@ -33,3 +33,15 @@ is signed with a ECDSA key which is unique to the connector.
 - The ECDSA key could protected e.g. by the Windows key store if required
 - The ECDSA key could be used to sign the messages themselves in case additional authentication
   is required.
+
+### Use Application Insights SDK instead of Open Telemetry SDK
+There are two SDKs to integrate with Azure Monitor: Application Insights and Open Telemetry.
+Microsoft recommends to use the new Open Telemetry SDK for ASP.NET Core. For now, we using
+the Application Insights SDK.
+
+#### Reasons
+- The Open Telemetry SDK for Azure Functions is still in Preview and missing features.
+  This means we would need to mix SDKs.
+- The Visual Studio integration seemingly no longer works with the Open Telemetry SDK.
+  We would need to use a separate dashboard for Open Telemetry (e.g. from .NET Aspire)
+  but that would not support the Application Insights SDK in the function app.
