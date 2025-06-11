@@ -12,7 +12,7 @@ namespace SuperBus.AppConfiguration;
 public static class ConfigurationBuilderExtensions
 {
     public static void AddSuperBusAzureAppConfiguration<T>(
-        this T configuration) where T : IConfigurationBuilder, IConfiguration
+        this T configuration) where T : IConfigurationBuilder, IConfigurationRoot
     {
         var appConfigEndpoint = configuration["SuperBus:AppConfiguration:Endpoint"];
         var appConfigConnection = configuration["SuperBus:AppConfiguration:Connection"];
@@ -47,5 +47,7 @@ public static class ConfigurationBuilderExtensions
                     .Select($"{appConfigPrefix}:*", appConfigEnvironment);
             });
         }
+
+        configuration.Reload();
     }
 }

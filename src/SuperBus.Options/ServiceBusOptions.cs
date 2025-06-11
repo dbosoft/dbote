@@ -8,7 +8,5 @@ namespace SuperBus.Options;
 
 public class ServiceBusOptions
 {
-    public string Connection { get; set; } = null!;
-
     public ServiceBusQueuesOptions Queues { get; set; } = new();
 }

@@ -8,15 +8,35 @@ import { FunctionAppFlexConsumption } from "@cdktf/provider-azurerm/lib/function
 import { DataAzurermFunctionAppHostKeys } from "@cdktf/provider-azurerm/lib/data-azurerm-function-app-host-keys";
 import { RoleAssignment } from "@cdktf/provider-azurerm/lib/role-assignment";
 import { AssetType, TerraformAsset } from "cdktf";
+import { KeyVault } from "@cdktf/provider-azurerm/lib/key-vault";
+import { env } from "process";
 
 export class SuperBusWorker extends Construct {
 
     public readonly signalREndpoint: string;
     public readonly functionPrincipalId: string;
     public readonly superBusEndpoint: string;
+    public readonly keyVaultId: string;
 
     constructor(scope: Construct, environment: Environnment, appConfigEndpoint: string, appInsightsConnection: string) {
         super(scope, environment.formatName('cdktf', 'worker'));
+
+        // Microsoft recommends to use a dedicated key vault for each function app
+        // as the function secrets are not scoped.
+        // See https://learn.microsoft.com/en-us/azure/azure-functions/functions-app-settings#azurewebjobssecretstoragekeyvaulturi
+        const functionKeyVault = new KeyVault(this, environment.formatName('kv', 'func'), {
+            name: environment.formatName('kv', 'func'),
+            location: environment.location,
+            resourceGroupName: environment.resourceGroup,
+            skuName: 'standard',
+            tenantId: environment.tenantId,
+            purgeProtectionEnabled: false,
+            // Explicitly disable access policies
+            // TODO required?
+            //accessPolicy: [],
+            enableRbacAuthorization: true,
+        });
+        this.keyVaultId = functionKeyVault.id;
 
         const functionStorageAccount = new StorageAccount(this, environment.formatSafeName('st', 'func'), {
             name: environment.formatSafeName('st', 'func'),
@@ -74,6 +94,13 @@ export class SuperBusWorker extends Construct {
                 type: 'SystemAssigned',
             },
             appSettings: {
+                // Workaround for missing support in the Terraform provider.
+                // Taken from https://github.com/Azure-Samples/azure-functions-flex-consumption-samples/blob/ec5ba183e89569f58771dfb5f3a6c41fca37269b/IaC/terraformazurerm/main.tf#L84
+                // Can be removed when https://github.com/hashicorp/terraform-provider-azurerm/pull/29099 is released
+                'AzureWebJobsStorage': '', 
+                'AzureWebJobsStorage__accountName': functionStorageAccount.name,
+                'AzureWebJobsSecretStorageType': 'keyvault',
+                'AzureWebJobsSecretStorageKeyVaultUri': functionKeyVault.vaultUri,
                 'SuperBus__AppConfiguration__Endpoint': appConfigEndpoint,
                 'SuperBus__AppConfiguration__Environment': environment.environment,
                 'SuperBus__AppConfiguration__Prefix': 'SuperBus:Worker',
@@ -82,18 +109,31 @@ export class SuperBusWorker extends Construct {
         
         this.functionPrincipalId = functionApp.identity.principalId;
 
-        new RoleAssignment(this, environment.formatName('role', 'func-st'), {
-            scope: functionStorageContainer.id,
+        new RoleAssignment(this, environment.formatName('role', 'func-st-blob'), {
+            scope: functionStorageAccount.id,
             roleDefinitionName: 'Storage Blob Data Contributor',
             principalId: functionApp.identity.principalId,
         });
 
-        const functionAppKeys = new DataAzurermFunctionAppHostKeys(this, environment.formatName('cdktf', 'func-keys'), {
-            name: functionApp.name,
-            resourceGroupName: functionApp.resourceGroupName,
+        // Microsoft recommends table storage access for writing certain diagnostic events
+        // See note in https://learn.microsoft.com/en-us/azure/azure-functions/functions-reference?tabs=blob&pivots=programming-language-csharp#connecting-to-host-storage-with-an-identity
+        new RoleAssignment(this, environment.formatName('role', 'func-st-table'), {
+            scope: functionStorageAccount.id,
+            roleDefinitionName: 'Storage Table Data Contributor',
+            principalId: functionApp.identity.principalId,
         });
 
+        new RoleAssignment(this, environment.formatName('role', 'func-kv'),{
+            scope: functionKeyVault.id,
+            roleDefinitionName: 'Key Vault Secrets Officer',
+            principalId: functionApp.identity.principalId,
+        })
+
         this.superBusEndpoint = `https://${functionApp.defaultHostname}/api`
-        this.signalREndpoint = `https://${functionApp.defaultHostname}/runtime/webhooks/signalr?code=${functionAppKeys.defaultFunctionKey}`
+        // By convention, the function key for the SignalR triggers is called signalr_extension.
+        // Hence, we can hardcode the name (the 095 is just an escaped version of _). This also
+        // breaks the dependency cycle between the function app and the Azure SignalR service.
+        const signalRKeyName = 'host--systemKey--signalr-095extension';
+        this.signalREndpoint = `https://${functionApp.defaultHostname}/runtime/webhooks/signalr?code={@Microsoft.KeyVault(SecretUri=${functionKeyVault.vaultUri}/secrets/${signalRKeyName})}`
     }
 }

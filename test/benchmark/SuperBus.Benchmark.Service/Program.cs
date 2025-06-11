@@ -26,10 +26,11 @@ builder.Services.AddRebus((configure, serviceProvider) =>
     var options = serviceProvider.GetRequiredService<IOptions<ServiceBusOptions>>().Value;
     var serviceQueueName = builder.Configuration["SuperBus:Service:ServiceBus:Queues:Service"];
     return configure
-        //         .Options(o => o.EnableSynchronousRequestReply())
         .Options(b => b.RetryStrategy(errorQueueName: options.Queues.Error))
         .Options(o => o.EnableSuperBus(options.Queues.Connectors))
-        .Transport(t => t.UseAzureServiceBus(options.Connection, serviceQueueName))
+        .Transport(t => t.UseAzureServiceBus(
+            builder.Configuration.GetSection("SuperBus:Service:ServiceBus:Connection"),
+            serviceQueueName!))
         .Serialization(s => s.UseSystemTextJson())
         .Logging(l => l.MicrosoftExtensionsLogging(serviceProvider.GetRequiredService<ILoggerFactory>()))
         .Routing(r => r.TypeBased()

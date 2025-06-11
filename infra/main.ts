@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { App, AzurermBackend, TerraformStack } from "cdktf";
+import { App, AzurermBackend, TerraformStack, Token } from "cdktf";
 import { AzurermProvider } from "@cdktf/provider-azurerm/lib/provider";
 import { StorageAccount } from "@cdktf/provider-azurerm/lib/storage-account";
 import { ServicebusNamespace } from "@cdktf/provider-azurerm/lib/servicebus-namespace";
@@ -17,6 +17,8 @@ import { SuperBusBenchmark } from "./constructs/superbus-benchmark";
 
 const location = "westeurope"; // Define the location for resources
 const resourceGroupName = "rg-superbus-test"; // Define the resource group name
+const tenantId = 'cb0bb315-f38b-4ab4-ad2d-d3ed25d23b53';
+const subscriptionId = '48b9d140-b453-4053-9fe1-a46509808c7f';
 
 function formatName(type: string, name: string, env: string, sanitize: boolean = false): string {
   const formattedName = `${type}-${name}-${env}`;
@@ -33,17 +35,17 @@ class SuperBusStack extends TerraformStack {
     super(scope, id);
 
     new AzurermProvider(this, "azurerm", {
-      subscriptionId: '48b9d140-b453-4053-9fe1-a46509808c7f',
+      tenantId,
+      subscriptionId,
       resourceProviderRegistrations: 'none',
       features: [
         {
           appConfiguration: [{ purgeSoftDeleteOnDestroy: false, recoverSoftDeleted: true }],
-          applicationInsights: [{ disableGeneratedRule: true }]
         },
       ],
     });
 
-    const environment = new Environnment(location, resourceGroupName, 'cmdev');
+    const environment = new Environnment(tenantId, location, resourceGroupName, 'cmdev');
 
     const insights = new SuperBusInsights(this, environment);
 
@@ -65,6 +67,11 @@ class SuperBusStack extends TerraformStack {
       name: serviceBusNamespaceName,
       sku: 'Basic',
     });
+    
+    // This is not optimal but there is no way to extract the hostname from
+    // serviceBusNamespace.endpoint at the moment (as it is a CDKTF token
+    // and there is no support for URL parsing at the moment).
+    const fullyQualifiedNamespace = `${serviceBusNamespace.name}.servicebus.windows.net`
 
     const cloudQueue = new ServicebusQueue(this, environment.formatName('sbq', 'cloud'), {
       namespaceId: serviceBusNamespace.id,
@@ -101,6 +108,9 @@ class SuperBusStack extends TerraformStack {
         name: 'Free_F1',
         capacity: 1,
       },
+      identity:{
+        type: 'SystemAssigned',
+      },
       serviceMode: 'Serverless',
       upstreamEndpoint: [
         {
@@ -113,6 +123,12 @@ class SuperBusStack extends TerraformStack {
       ]
     });
 
+    new RoleAssignment(this, environment.formatName('role', 'signalr-func-kv'), {
+      scope: worker.keyVaultId,
+      roleDefinitionName: 'Key Vault Secrets User',
+      principalId: signalrService.identity.principalId,
+    })
+
     // Storage
     const storageAccount = new StorageAccount(this, environment.formatSafeName('st'), {
       name: environment.formatSafeName('st'),
@@ -122,21 +138,19 @@ class SuperBusStack extends TerraformStack {
       accountReplicationType: "LRS",
     });
 
-    /*
     const table = new StorageTable(this, environment.formatName('stt'), {
       storageAccountName: storageAccount.name,
-      name: 'superbus',
+      name: 'superbusconnectors',
     })
 
     new StorageTableEntity(this, environment.formatName('stte'), {
       storageTableId: table.id,
-      partitionKey: 'MY-TENANT',
-      rowKey: 'MY_CONNECTOR',
+      partitionKey: 'TENANT-A',
+      rowKey: 'CONNECTOR-A',
       entity:  {
-        'SigningKey': ''
-      }
+        'PublicKey': 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDSfgIieGaVTF7RLRoo0HH/xUjg3T8jHr1RkxeRBqwy7lAGBG6Y4Pnlka0qqVARrx3TVuMHhmRSQnu1KfFgKnuA==',
+      },
     });
-    */
 
     // role assignments - worker
     new RoleAssignment(this, environment.formatName('role', 'func-sbns'), {
@@ -147,7 +161,7 @@ class SuperBusStack extends TerraformStack {
 
     new RoleAssignment(this, environment.formatName('role', 'func-appcs'), {
       scope: appConfiguration.id,
-      roleDefinitionName: 'Azure Configuration Data Reader',
+      roleDefinitionName: 'App Configuration Data Reader',
       principalId: worker.functionPrincipalId,
     });
 
@@ -177,10 +191,17 @@ class SuperBusStack extends TerraformStack {
       label: environment.environment,
     });
 
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-connection'), {
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-namespace'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Worker:ServiceBus:Connection',
-      value: `Endpoint=sb://${serviceBusNamespace.name}.servicebus.windows.net/`,
+      key: 'SuperBus:Worker:ServiceBus:Connection:fullyQualifiedNamespace',
+      value: fullyQualifiedNamespace,
+      label: environment.environment,
+    });
+
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-credentialtype'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Worker:ServiceBus:Connection:credential',
+      value: 'managedidentity',
       label: environment.environment,
     });
 
@@ -205,11 +226,17 @@ class SuperBusStack extends TerraformStack {
       label: environment.environment,
     });
 
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-signalr-connection'), {
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-signalr-serviceuri'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Worker:SignalR:Connection',
-      // TODO use connection string instead?
-      value: `Endpoint=${signalrService.hostname};Version=1.0;`,
+      key: 'SuperBus:Worker:SignalR:Connection:serviceUri',
+      value: `https://${signalrService.hostname}`,
+      label: environment.environment,
+    });
+
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-signalr-credentialtype'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Worker:SignalR:Connection:credential',
+      value: 'managedidentity',
       label: environment.environment,
     });
 
@@ -230,16 +257,23 @@ class SuperBusStack extends TerraformStack {
 
     new RoleAssignment(this, environment.formatName('role', 'app-cloud-appcs'), {
       scope: appConfiguration.id,
-      roleDefinitionName: 'Azure Configuration Data Reader',
+      roleDefinitionName: 'App Configuration Data Reader',
       principalId: benchmark.cloudPrincipalId,
     });
 
 
     // app config - benchmark cloud
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-connection'), {
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-namespace'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Cloud:ServiceBus:Connection',
-      value: `Endpoint=sb://${serviceBusNamespace.name}.servicebus.windows.net/`,
+      key: 'SuperBus:Cloud:ServiceBus:Connection:fullyQualifiedNamespace',
+      value: fullyQualifiedNamespace,
+      label: environment.environment,
+    });
+
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-credentialtype'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Worker:ServiceBus:Connection:credential',
+      value: 'managedidentity',
       label: environment.environment,
     });
 
@@ -280,15 +314,22 @@ class SuperBusStack extends TerraformStack {
 
     new RoleAssignment(this, environment.formatName('role', 'app-service-appcs'), {
       scope: appConfiguration.id,
-      roleDefinitionName: 'Azure Configuration Data Reader',
+      roleDefinitionName: 'App Configuration Data Reader',
       principalId: benchmark.servicePrincipalId,
     });
 
     // app config - benchmark service
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-connection'), {
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-namespace'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Service:ServiceBus:Connection',
-      value: `Endpoint=sb://${serviceBusNamespace.name}.servicebus.windows.net/`,
+      key: 'SuperBus:Service:ServiceBus:Connection:fullyQualifiedNamespace',
+      value: fullyQualifiedNamespace,
+      label: environment.environment,
+    });
+
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-credentialtype'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'SuperBus:Service:ServiceBus:Connection:credential',
+      value: 'managedidentity',
       label: environment.environment,
     });
 

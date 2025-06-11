@@ -14,6 +14,7 @@ using System;
 using System.Net.Sockets;
 using Microsoft.Extensions.Configuration;
 using SuperBus.Options;
+using SuperBus.Rebus.Integration;
 
 
 var builder = DFrameApp.CreateBuilder(portWeb: 7312, portListenWorker: 7313);
@@ -35,7 +36,9 @@ builder.WorkerBuilder.ConfigureServices((context, services) =>
         return configure
             .Options(o => o.EnableSynchronousRequestReply())
             .Options(b => b.RetryStrategy(errorQueueName: options.Queues.Error))
-            .Transport(t => t.UseAzureServiceBus(options.Connection, benchmarkQueueName))
+            .Transport(t => t.UseAzureServiceBus(
+                context.Configuration.GetSection("SuperBus:Runner:ServiceBus:Connection"),
+                benchmarkQueueName!))
             .Serialization(s => s.UseSystemTextJson())
             .Routing(r => r.TypeBased()
                 .Map<BenchmarkRequest>(options.Queues.Cloud));

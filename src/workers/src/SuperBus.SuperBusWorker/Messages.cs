@@ -26,6 +26,7 @@ using SuperBus.Options;
 
 namespace SuperBus.SuperBusWorker;
 
+[SignalRConnection("SuperBus:Worker:SignalR:Connection")]
 internal class Messages(
     ILogger<Messages> logger,
     IMessageConverter messageConverter,
@@ -38,6 +39,8 @@ internal class Messages(
     ServiceBusClient serviceBusClient)
     : ServerlessHub<IMessages>(serviceProvider)
 {
+    private const string HubName = nameof(Messages);
+
     [Function("negotiate")]
     public async Task<HttpResponseData> Negotiate(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
@@ -121,7 +124,7 @@ internal class Messages(
     [Function(nameof(GetQueueMetadata))]
     public async Task<SuperBusQueueMetadata> GetQueueMetadata(
         [SignalRTrigger(
-            "Messages",
+            HubName,
             "messages",
             nameof(this.GetQueueMetadata),
             ConnectionStringSetting = "SuperBus:Worker:SignalR:Connection")]
@@ -147,7 +150,7 @@ internal class Messages(
     [Function(nameof(SendMessage))]
     public async Task SendMessage(
         [SignalRTrigger(
-            "Messages",
+            HubName,
             "messages",
             nameof(this.SendMessage),
             nameof(queue), nameof(message),

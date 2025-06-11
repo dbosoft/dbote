@@ -30,7 +30,9 @@ builder.Services.AddRebus((configure, serviceProvider) =>
     return configure
         .Options(b => b.RetryStrategy(errorQueueName: options.Queues.Error))
         .Options(o => o.EnableSuperBus(options.Queues.Connectors))
-        .Transport(t => t.UseAzureServiceBus(options.Connection, options.Queues.Cloud))
+        .Transport(t => t.UseAzureServiceBus(
+            builder.Configuration.GetSection("SuperBus:Cloud:ServiceBus:Connection"),
+            options.Queues.Cloud))
         .Serialization(s => s.UseSystemTextJson())
         .Sagas(s => s.StoreInMemory())
         .Logging(l => l.MicrosoftExtensionsLogging(serviceProvider.GetRequiredService<ILoggerFactory>()))

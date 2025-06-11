@@ -75,7 +75,7 @@ export class SuperBusBenchmark extends Construct {
             },
             appSettings: {
                 'WEBSITE_RUN_FROM_PACKAGE': `https://${appStorageAccount.primaryBlobEndpoint}/${appStorageContainer.name}/${cloudPackageBlob.name}`,
-                'APPLICATIONINSIGHTS_CONNECTION_STRING ': appInsightsConnection,
+                'APPLICATIONINSIGHTS_CONNECTION_STRING': appInsightsConnection,
                 'SuperBus__AppConfiguration__Endpoint': appConfigConnection,
                 'SuperBus__AppConfiguration__Environment': environment.environment,
                 'SuperBus__AppConfiguration__Prefix': 'SuperBus:Cloud',

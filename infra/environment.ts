@@ -2,11 +2,13 @@ const appName: string = 'superbus'
 
 export class Environnment {
 
+    public readonly tenantId: string;
     public readonly environment: string;
     public readonly location: string;
     public readonly resourceGroup: string;
 
-    constructor(location: string, resourceGroup: string, environment: string) {
+    constructor(tenantId: string, location: string, resourceGroup: string, environment: string) {
+        this.tenantId = tenantId;
         this.location = location;
         this.resourceGroup = resourceGroup;
         this.environment = environment;
