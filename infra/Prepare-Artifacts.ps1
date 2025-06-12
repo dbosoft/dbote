@@ -6,36 +6,28 @@ $PSNativeCommandUseErrorActionPreference = $true
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
+$acr = 'acrsuperbustest-czbddsczaug6adgm.azurecr.io'
 $artifactsPath = Join-Path $PSScriptRoot 'artifacts'
+try {
+    Push-Location ../src/workers/src/SuperBus.SuperBusWorker
+    dotnet publish -c Release -r linux-x64 -o (Join-Path $artifactsPath 'SuperBus.SuperBusWorker')
+    Compress-Archive `
+        -Path "$(Join-Path $artifactsPath 'SuperBus.SuperBusWorker')/*" `
+        -DestinationPath (Join-Path $artifactsPath 'SuperBus.SuperBusWorker.zip') `
+        -Force
+    Pop-Location
 
-# Push-Location ./SuperBus.Samples.Simple.Cloud
-# dotnet publish -c Release -r linux-x64 -o (Join-Path $artifactsPath 'SuperBus.Samples.Simple.Cloud')
-# Pop-Location
+    Push-Location ../test/benchmark/SuperBus.Benchmark.Cloud
+    dotnet publish -c Release -r linux-x64
+    docker build --tag "$acr/superbus-benchmark/cloud" ./
+    docker push "$acr/superbus-benchmark/cloud"
+    Pop-Location
 
-# Push-Location ./SuperBus.Samples.Simple.Connector
-# dotnet publish -c Release -r linux-x64 -o (Join-Path $artifactsPath 'SuperBus.Samples.Simple.Connector')
-# Pop-Location
-
-Push-Location ../src/workers/src/SuperBus.SuperBusWorker
-dotnet publish -c Release -r linux-x64 -o (Join-Path $artifactsPath 'SuperBus.SuperBusWorker')
-Compress-Archive `
-    -Path "$(Join-Path $artifactsPath 'SuperBus.SuperBusWorker')/*" `
-    -DestinationPath (Join-Path $artifactsPath 'SuperBus.SuperBusWorker.zip') `
-    -Force
-Pop-Location
-
-Push-Location ../test/benchmark/SuperBus.Benchmark.Cloud
-dotnet publish -c Release -r linux-x64 -o (Join-Path $artifactsPath 'SuperBus.Benchmark.Cloud')
-Compress-Archive `
-    -Path "$(Join-Path $artifactsPath 'SuperBus.Benchmark.Cloud')/*" `
-    -DestinationPath (Join-Path $artifactsPath 'SuperBus.Benchmark.Cloud.zip') `
-    -Force
-Pop-Location
-
-Push-Location ../test/benchmark/SuperBus.Benchmark.Service
-dotnet publish -c Release -r linux-x64 -o (Join-Path $artifactsPath 'SuperBus.Benchmark.Service')
-Compress-Archive `
-    -Path "$(Join-Path $artifactsPath 'SuperBus.Benchmark.Service')/*" `
-    -DestinationPath (Join-Path $artifactsPath 'SuperBus.Benchmark.Service.zip') `
-    -Force
-Pop-Location
+    Push-Location ../test/benchmark/SuperBus.Benchmark.Service
+    dotnet publish -c Release -r linux-x64
+    docker build --tag "$acr/superbus-benchmark/service" ./
+    docker push "$acr/superbus-benchmark/service"
+    Pop-Location
+} finally {
+    Pop-Location
+}

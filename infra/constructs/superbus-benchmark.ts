@@ -1,12 +1,10 @@
 import { Construct } from "constructs";
 import { Environnment } from "../environment";
-import { StorageAccount } from "@cdktf/provider-azurerm/lib/storage-account";
-import { StorageContainer } from "@cdktf/provider-azurerm/lib/storage-container";
-import { AssetType, TerraformAsset } from "cdktf";
-import { StorageBlob } from "@cdktf/provider-azurerm/lib/storage-blob";
-import { ServicePlan } from "@cdktf/provider-azurerm/lib/service-plan";
-import { LinuxWebApp } from "@cdktf/provider-azurerm/lib/linux-web-app";
 import { RoleAssignment } from "@cdktf/provider-azurerm/lib/role-assignment";
+import { DataAzurermContainerRegistry } from "@cdktf/provider-azurerm/lib/data-azurerm-container-registry";
+import { ContainerApp } from "@cdktf/provider-azurerm/lib/container-app";
+import { ContainerAppEnvironment } from "@cdktf/provider-azurerm/lib/container-app-environment";
+import { UserAssignedIdentity } from "@cdktf/provider-azurerm/lib/user-assigned-identity";
 
 export class SuperBusBenchmark extends Construct {
 
@@ -16,114 +14,135 @@ export class SuperBusBenchmark extends Construct {
     constructor(scope: Construct, environment: Environnment, appConfigConnection: string, appInsightsConnection: string) {
         super(scope, environment.formatName('cdktf', 'benchmark'));
 
-        const appStorageAccount = new StorageAccount(this, environment.formatSafeName('st', 'app'), {
-            name: environment.formatSafeName('st', 'app'),
-            location:  environment.location,
+        const containerRegistry = new DataAzurermContainerRegistry(this, 'acrsuperbustest', {
+            name: 'acrsuperbustest',
             resourceGroupName: environment.resourceGroup,
-            accountTier: "Standard",
-            accountReplicationType: "LRS",
-        });
-
-        const appStorageContainer = new StorageContainer(this, environment.formatSafeName('stc', 'app-cloud-packages'), {
-            name: environment.formatSafeName('stc', 'app'),
-            storageAccountId: appStorageAccount.id,
-            containerAccessType: "private",
-        });
-
-        const cloudAsset = new TerraformAsset(this, environment.formatName('cdktf', 'app-cloud-asset'), {
-            path: './artifacts/SuperBus.Benchmark.Cloud.zip',
-            type: AssetType.FILE,
         })
 
-        const cloudPackageBlob = new StorageBlob(this, environment.formatSafeName('stb', 'app-cloud-package'), {
-            name: environment.formatSafeName('stb', 'app-cloud-package'),
-            storageAccountName: appStorageAccount.name,
-            storageContainerName: appStorageContainer.name,
-            source: cloudAsset.path,
-            type: 'Block',
-        });
-
-        const serviceAsset = new TerraformAsset(this, environment.formatName('cdktf', 'app-service-asset'), {
-            path: './artifacts/SuperBus.Benchmark.Service.zip',
-            type: AssetType.FILE,
-        })
-
-        const servicePackageBlob = new StorageBlob(this, environment.formatSafeName('stb', 'app-service-package'), {
-            name: environment.formatSafeName('stb', 'app-service-package'),
-            storageAccountName: appStorageAccount.name,
-            storageContainerName: appStorageContainer.name,
-            source: serviceAsset.path,
-            type: 'Block',
-        });
-
-        const appServicePlan = new ServicePlan(this, environment.formatName('asp', 'app'), {
-            name: environment.formatName('asp', 'app'),
+        const appEnvironment = new ContainerAppEnvironment(this, environment.formatName('cae'), {
+            name: environment.formatName('cae'),
             location: environment.location,
             resourceGroupName: environment.resourceGroup,
-            skuName: 'B1',
-            osType: 'Linux',
-        });
-
-        const cloudApp = new LinuxWebApp(this, environment.formatName('app', 'cloud'), {
-            name: environment.formatName('app', 'cloud'),
-            location: environment.location,
-            resourceGroupName: environment.resourceGroup,
-            servicePlanId: appServicePlan.id,
-            siteConfig: {
-                alwaysOn: true,
-                applicationStack: {
-                    dotnetVersion: '8.0',
+            workloadProfile:[
+                {
+                    name: 'Consumption',
+                    workloadProfileType: 'Consumption',
                 },
+            ],
+            // TODO investigate logging
+        });
+
+        const acrIdentity = new UserAssignedIdentity(this, environment.formatName('id', 'ca'), {
+            name: environment.formatName('id', 'ca'),
+            location: environment.location,
+            resourceGroupName: environment.resourceGroup,
+        });
+
+        const acrIdentityRole = new RoleAssignment(this, environment.formatName('role', 'id-ca-acr'), {
+            scope: containerRegistry.id,
+            // 'Container Registry Repository Reader' whebn using RBAC+ABAC
+            roleDefinitionName: 'AcrPull',
+            principalId: acrIdentity.principalId,
+        })
+
+        const cloudApp = new ContainerApp(this, environment.formatName('ca', 'cloud'), {
+            name: environment.formatName('ca', 'cloud'),
+            resourceGroupName: environment.resourceGroup,
+            containerAppEnvironmentId: appEnvironment.id,
+            revisionMode: 'Single',
+            dependsOn: [acrIdentityRole],
+            template: {
+                container: [
+                    {
+                        name: environment.formatName('ca', 'cloud'),
+                        image: 'acrsuperbustest-czbddsczaug6adgm.azurecr.io/superbus-benchmark/cloud:latest',
+                        cpu: 0.25,
+                        memory: '0.5Gi',
+                        env: [
+                            {
+                                name: 'APPLICATIONINSIGHTS_CONNECTION_STRING',
+                                value: appInsightsConnection,
+                            },
+                            {
+                                name: 'SuperBus__AppConfiguration__Endpoint',
+                                value: appConfigConnection,
+                            },
+                            {
+                                name: 'SuperBus__AppConfiguration__Environment',
+                                value: environment.environment,
+                            },
+                            {
+                                name: 'SuperBus__AppConfiguration__Prefix',
+                                value: 'SuperBus:Cloud',
+                            },
+                        ],
+                    },
+                ],
+                minReplicas: 1,
+                maxReplicas: 1,
             },
             identity: {
-                type: 'SystemAssigned',
+                type: 'SystemAssigned, UserAssigned',
+                identityIds: [acrIdentity.id],
             },
-            appSettings: {
-                'WEBSITE_RUN_FROM_PACKAGE': `${appStorageAccount.primaryBlobEndpoint}${appStorageContainer.name}/${cloudPackageBlob.name}`,
-                'APPLICATIONINSIGHTS_CONNECTION_STRING': appInsightsConnection,
-                'SuperBus__AppConfiguration__Endpoint': appConfigConnection,
-                'SuperBus__AppConfiguration__Environment': environment.environment,
-                'SuperBus__AppConfiguration__Prefix': 'SuperBus:Cloud',
-            }
+            registry: [
+                {
+                    server: containerRegistry.loginServer,
+                    identity: acrIdentity.id,
+                }
+            ]
         });
 
         this.cloudPrincipalId = cloudApp.identity.principalId;
 
-        const serviceApp = new LinuxWebApp(this, environment.formatName('app', 'service'), {
-            name: environment.formatName('app', 'service'),
-            location: environment.location,
+        const serviceApp = new ContainerApp(this, environment.formatName('ca', 'service'), {
+            name: environment.formatName('ca', 'service'),
             resourceGroupName: environment.resourceGroup,
-            servicePlanId: appServicePlan.id,
-            siteConfig: {
-                alwaysOn: true,
-                applicationStack: {
-                    dotnetVersion: '8.0',
-                },
+            containerAppEnvironmentId: appEnvironment.id,
+            revisionMode: 'Single',
+            dependsOn: [acrIdentityRole],
+            template: {
+                container: [
+                    {
+                        name: environment.formatName('ca', 'service'),
+                        image: 'acrsuperbustest-czbddsczaug6adgm.azurecr.io/superbus-benchmark/service:latest',
+                        cpu: 0.25,
+                        memory: '0.5Gi',
+                        env: [
+                            {
+                                name: 'APPLICATIONINSIGHTS_CONNECTION_STRING',
+                                value: appInsightsConnection,
+                            },
+                            {
+                                name: 'SuperBus__AppConfiguration__Endpoint',
+                                value: appConfigConnection,
+                            },
+                            {
+                                name: 'SuperBus__AppConfiguration__Environment',
+                                value: environment.environment,
+                            },
+                            {
+                                name: 'SuperBus__AppConfiguration__Prefix',
+                                value: 'SuperBus:Service',
+                            },
+                        ],
+                    },
+                ],
+                minReplicas: 1,
+                maxReplicas: 1,
             },
             identity: {
-                type: 'SystemAssigned',
+                type: 'SystemAssigned, UserAssigned',
+                identityIds: [acrIdentity.id],
             },
-            appSettings: {
-                'WEBSITE_RUN_FROM_PACKAGE': `${appStorageAccount.primaryBlobEndpoint}${appStorageContainer.name}/${servicePackageBlob.name}`,
-                'APPLICATIONINSIGHTS_CONNECTION_STRING': appInsightsConnection,
-                'SuperBus__AppConfiguration__Endpoint': appConfigConnection,
-                'SuperBus__AppConfiguration__Environment': environment.environment,
-                'SuperBus__AppConfiguration__Prefix': 'SuperBus:Service',
-            }
+            registry: [
+                {
+                    server: containerRegistry.loginServer,
+                    identity: acrIdentity.id,
+                }
+            ]
         });
 
         this.servicePrincipalId = serviceApp.identity.principalId;
-
-        new RoleAssignment(this, environment.formatName('role', 'app-cloud-st'), {
-            scope: appStorageAccount.id,
-            roleDefinitionName: 'Storage Blob Data Reader',
-            principalId: cloudApp.identity.principalId,
-        });
-
-        new RoleAssignment(this, environment.formatName('role', 'func-st'), {
-            scope: appStorageAccount.id,
-            roleDefinitionName: 'Storage Blob Data Reader',
-            principalId: serviceApp.identity.principalId,
-        });
     }
 }
