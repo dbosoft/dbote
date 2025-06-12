@@ -69,12 +69,6 @@ public static class AzureServiceBusConfigurationExtensions
     private static TokenCredential GetCredential(
         IConfiguration configuration)
     {
-        var credentialType = configuration["credential"];
-        if (string.IsNullOrEmpty(credentialType))
-            throw new ArgumentException(
-                "The configuration must either be a connection string or contain the 'credential' key.",
-                nameof(configuration));
-
         if (string.Equals(configuration["credential"], "managedidentity", StringComparison.OrdinalIgnoreCase))
             return new ManagedIdentityCredential();
 

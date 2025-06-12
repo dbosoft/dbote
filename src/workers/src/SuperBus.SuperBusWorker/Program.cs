@@ -23,7 +23,18 @@ builder.Services
     .AddApplicationInsightsTelemetryWorkerService()
     .ConfigureFunctionsApplicationInsights();
 
-builder.Services.AddLogging(c => c.AddSimpleConsole().AddApplicationInsights());
+builder.Services.AddLogging(loggingBuilder =>
+{
+    loggingBuilder.AddSimpleConsole();
+    loggingBuilder.AddApplicationInsights();
+    loggingBuilder.Services.Configure<LoggerFilterOptions>(
+        options => options.Rules.Add(
+            new LoggerFilterRule(
+                "Microsoft.Extensions.Logging.ApplicationInsights.ApplicationInsightsLoggerProvider",
+                null,
+                LogLevel.Debug,
+                null)));
+});
 
 builder.Services.Configure<ServiceBusOptions>(builder.Configuration.GetSection("SuperBus:Worker:ServiceBus"));
 builder.Services.Configure<OpenIdOptions>(builder.Configuration.GetSection("SuperBus:Worker:OpenId"));

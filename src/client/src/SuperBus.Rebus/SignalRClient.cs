@@ -91,6 +91,7 @@ internal class SignalRClient(
             SigningCredentials = signingCredentials,
             Audience = endpointUri.ToString(),
             Issuer = clientId,
+            IncludeKeyIdInHeader = true,
         };
 
         var jwt = handler.CreateToken(tokenDescriptor);

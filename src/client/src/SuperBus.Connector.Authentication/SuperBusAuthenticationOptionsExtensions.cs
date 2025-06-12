@@ -13,21 +13,25 @@ namespace SuperBus.Connector.Authentication;
 public static class SuperBusAuthenticationOptionsExtensions
 {
     public static SecurityKey GetSigningKey(
-        this SuperBusAuthenticationOptions options)
+        this SuperBusOptions options)
     {
-        if (options.AuthenticationType != SuperBusAuthenticationType.Value)
+        if (options.Authentication.AuthenticationType != SuperBusAuthenticationType.Value)
             throw new ArgumentException(
-                $"The authentication type {options.AuthenticationType} is not supported",
+                $"The authentication type {options.Authentication.AuthenticationType} is not supported",
                 nameof(options));
 
-        if (string.IsNullOrWhiteSpace(options.SigningKey))
+        if (string.IsNullOrWhiteSpace(options.Authentication.SigningKey))
             throw new ArgumentException(
                 $"The signing key is missing",
                 nameof(options));
 
         // TODO Do we need to create new instance of ECDsa every time? (thread safety and dispose)
         var ecdsa = ECDsa.Create();
-        ecdsa.ImportPkcs8PrivateKey(Convert.FromBase64String(options.SigningKey), out _);
-        return new ECDsaSecurityKey(ecdsa);
+        ecdsa.ImportPkcs8PrivateKey(Convert.FromBase64String(options.Authentication.SigningKey), out _);
+        return new ECDsaSecurityKey(ecdsa)
+        {
+            // TODO improve KID?
+            KeyId = $"{options.TenantId}-{options.ConnectorId}",
+        };
     }
 }

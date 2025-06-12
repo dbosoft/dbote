@@ -64,9 +64,12 @@ public class OpenId(
 
         var connectorEcdsa = ECDsa.Create();
         connectorEcdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(connectorEntity.PublicKey), out _);
-        var connectorKey = new ECDsaSecurityKey(connectorEcdsa);
+        var connectorKey = new ECDsaSecurityKey(connectorEcdsa)
+        {
+            KeyId = assertionToken.Subject,
+        };
 
-        logger.LogDebug("Expected audience: {Audience}", openIdOptions.Value.Authority);
+        logger.LogInformation("Expected audience: {Audience}", openIdOptions.Value.Authority);
 
         var assertionTokenResult = await handler.ValidateTokenAsync(assertionToken, new TokenValidationParameters()
         {
@@ -78,7 +81,7 @@ public class OpenId(
 
         if (!assertionTokenResult.IsValid)
         {
-            logger.LogDebug(assertionTokenResult.Exception,
+            logger.LogInformation(assertionTokenResult.Exception,
                 "Validation of client assertion token for connector with tenant ID '{TenantId}' and connector ID '{ConnectorId}' failed:");
             return new BadRequestResult();
         }
