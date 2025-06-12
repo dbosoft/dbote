@@ -272,7 +272,7 @@ class SuperBusStack extends TerraformStack {
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-credentialtype'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Worker:ServiceBus:Connection:credential',
+      key: 'SuperBus:Cloud:ServiceBus:Connection:credential',
       value: 'managedidentity',
       label: environment.environment,
     });

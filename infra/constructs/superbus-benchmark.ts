@@ -15,7 +15,7 @@ export class SuperBusBenchmark extends Construct {
 
     constructor(scope: Construct, environment: Environnment, appConfigConnection: string, appInsightsConnection: string) {
         super(scope, environment.formatName('cdktf', 'benchmark'));
-        
+
         const appStorageAccount = new StorageAccount(this, environment.formatSafeName('st', 'app'), {
             name: environment.formatSafeName('st', 'app'),
             location:  environment.location,
@@ -69,12 +69,17 @@ export class SuperBusBenchmark extends Construct {
             location: environment.location,
             resourceGroupName: environment.resourceGroup,
             servicePlanId: appServicePlan.id,
-            siteConfig: {},
+            siteConfig: {
+                alwaysOn: true,
+                applicationStack: {
+                    dotnetVersion: '8.0',
+                },
+            },
             identity: {
                 type: 'SystemAssigned',
             },
             appSettings: {
-                'WEBSITE_RUN_FROM_PACKAGE': `https://${appStorageAccount.primaryBlobEndpoint}/${appStorageContainer.name}/${cloudPackageBlob.name}`,
+                'WEBSITE_RUN_FROM_PACKAGE': `${appStorageAccount.primaryBlobEndpoint}${appStorageContainer.name}/${cloudPackageBlob.name}`,
                 'APPLICATIONINSIGHTS_CONNECTION_STRING': appInsightsConnection,
                 'SuperBus__AppConfiguration__Endpoint': appConfigConnection,
                 'SuperBus__AppConfiguration__Environment': environment.environment,
@@ -89,12 +94,17 @@ export class SuperBusBenchmark extends Construct {
             location: environment.location,
             resourceGroupName: environment.resourceGroup,
             servicePlanId: appServicePlan.id,
-            siteConfig: {},
+            siteConfig: {
+                alwaysOn: true,
+                applicationStack: {
+                    dotnetVersion: '8.0',
+                },
+            },
             identity: {
                 type: 'SystemAssigned',
             },
             appSettings: {
-                'WEBSITE_RUN_FROM_PACKAGE': `https://${appStorageAccount.primaryBlobEndpoint}/${appStorageContainer.name}/${servicePackageBlob.name}`,
+                'WEBSITE_RUN_FROM_PACKAGE': `${appStorageAccount.primaryBlobEndpoint}${appStorageContainer.name}/${servicePackageBlob.name}`,
                 'APPLICATIONINSIGHTS_CONNECTION_STRING': appInsightsConnection,
                 'SuperBus__AppConfiguration__Endpoint': appConfigConnection,
                 'SuperBus__AppConfiguration__Environment': environment.environment,
