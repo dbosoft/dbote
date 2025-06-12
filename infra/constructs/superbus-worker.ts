@@ -18,6 +18,8 @@ export class SuperBusWorker extends Construct {
     public readonly superBusEndpoint: string;
     public readonly keyVaultId: string;
 
+    private readonly functionApp: FunctionAppFlexConsumption;
+
     constructor(scope: Construct, environment: Environnment, appConfigEndpoint: string, appInsightsConnection: string) {
         super(scope, environment.formatName('cdktf', 'worker'));
 
@@ -75,8 +77,9 @@ export class SuperBusWorker extends Construct {
             osType: 'Linux',
         });
 
-        const functionApp = new FunctionAppFlexConsumption(this, environment.formatName('func'), {
-            name: environment.formatName('func'),
+        const functionAppName = environment.formatName('func');
+        this.functionApp = new FunctionAppFlexConsumption(this, functionAppName, {
+            name: functionAppName,
             location: environment.location,
             resourceGroupName: environment.resourceGroup,
             servicePlanId: functionServicePlan.id,
@@ -104,15 +107,17 @@ export class SuperBusWorker extends Construct {
                 'SuperBus__AppConfiguration__Endpoint': appConfigEndpoint,
                 'SuperBus__AppConfiguration__Environment': environment.environment,
                 'SuperBus__AppConfiguration__Prefix': 'SuperBus:Worker',
+                'SuperBus__Worker__OpenId__Authority': `https://${functionAppName}.azurewebsites.net/api`
+                // worker.addAppSetting('SuperBus__Worker__OpenId__Authority', worker.superBusEndpoint);
             },
         });
         
-        this.functionPrincipalId = functionApp.identity.principalId;
+        this.functionPrincipalId = this.functionApp.identity.principalId;
 
         new RoleAssignment(this, environment.formatName('role', 'func-st-blob'), {
             scope: functionStorageAccount.id,
             roleDefinitionName: 'Storage Blob Data Contributor',
-            principalId: functionApp.identity.principalId,
+            principalId: this.functionApp.identity.principalId,
         });
 
         // Microsoft recommends table storage access for writing certain diagnostic events
@@ -120,20 +125,24 @@ export class SuperBusWorker extends Construct {
         new RoleAssignment(this, environment.formatName('role', 'func-st-table'), {
             scope: functionStorageAccount.id,
             roleDefinitionName: 'Storage Table Data Contributor',
-            principalId: functionApp.identity.principalId,
+            principalId: this.functionApp.identity.principalId,
         });
 
         new RoleAssignment(this, environment.formatName('role', 'func-kv'),{
             scope: functionKeyVault.id,
             roleDefinitionName: 'Key Vault Secrets Officer',
-            principalId: functionApp.identity.principalId,
+            principalId: this.functionApp.identity.principalId,
         })
 
-        this.superBusEndpoint = `https://${functionApp.defaultHostname}/api`
+        this.superBusEndpoint = `https://${this.functionApp.defaultHostname}/api`
         // By convention, the function key for the SignalR triggers is called signalr_extension.
         // Hence, we can hardcode the name (the 095 is just an escaped version of _). This also
         // breaks the dependency cycle between the function app and the Azure SignalR service.
         const signalRKeyName = 'host--systemKey--signalr-095extension';
-        this.signalREndpoint = `https://${functionApp.defaultHostname}/runtime/webhooks/signalr?code={@Microsoft.KeyVault(SecretUri=${functionKeyVault.vaultUri}/secrets/${signalRKeyName})}`
+        this.signalREndpoint = `https://${this.functionApp.defaultHostname}/runtime/webhooks/signalr?code={@Microsoft.KeyVault(SecretUri=${functionKeyVault.vaultUri}secrets/${signalRKeyName})}`
+    }
+
+    addAppSetting(key: string, value: string) {
+        this.functionApp.appSettingsInput![key] = value;
     }
 }

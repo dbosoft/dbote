@@ -3,7 +3,7 @@ import { App, AzurermBackend, TerraformStack, Token } from "cdktf";
 import { AzurermProvider } from "@cdktf/provider-azurerm/lib/provider";
 import { StorageAccount } from "@cdktf/provider-azurerm/lib/storage-account";
 import { ServicebusNamespace } from "@cdktf/provider-azurerm/lib/servicebus-namespace";
-import { SignalrService } from "@cdktf/provider-azurerm/lib/signalr-service";
+import { SignalrService, SignalrServiceUpstreamEndpointList } from "@cdktf/provider-azurerm/lib/signalr-service";
 import { RoleAssignment } from "@cdktf/provider-azurerm/lib/role-assignment";
 import { ServicebusQueue } from "@cdktf/provider-azurerm/lib/servicebus-queue";
 import { AppConfiguration } from "@cdktf/provider-azurerm/lib/app-configuration";
@@ -99,7 +99,7 @@ class SuperBusStack extends TerraformStack {
     });
 
     // SignalR
-    const signalrServiceName = formatName('signalr', 'superbus', 'cmdev', false);
+    const signalrServiceName = environment.formatName('signalr', 'superbus');
     const signalrService = new SignalrService(this, signalrServiceName, {
       name: signalrServiceName,
       location,
@@ -184,6 +184,17 @@ class SuperBusStack extends TerraformStack {
     });
 
     // app config - worker
+
+    worker.addAppSetting('SuperBus__Worker__Storage__Connection', storageAccount.primaryConnectionString);
+    worker.addAppSetting('SuperBus__Worker__ServiceBus__Connection__fullyQualifiedNamespace', fullyQualifiedNamespace);
+    worker.addAppSetting('SuperBus__Worker__ServiceBus__Connection__credential', 'managedidentity');
+    worker.addAppSetting('SuperBus__Worker__ServiceBus__Queues__Cloud', cloudQueue.name);
+    worker.addAppSetting('SuperBus__Worker__ServiceBus__Queues__Connectors', connectorsQueue.name);
+    worker.addAppSetting('SuperBus__Worker__ServiceBus__Queues__Error', errorQueue.name);
+    worker.addAppSetting('SuperBus__Worker__SignalR__Connection__serviceUri', `https://${signalrServiceName}.service.signalr.net`);
+    worker.addAppSetting('SuperBus__Worker__SignalR__Connection__credential', 'managedidentity');
+
+/*
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-storage-connection'), {
       configurationStoreId: appConfiguration.id,
       key: 'SuperBus:Worker:Storage:Connection',
@@ -246,7 +257,7 @@ class SuperBusStack extends TerraformStack {
       value: worker.superBusEndpoint,
       label: environment.environment,
     });
-
+*/
 
     // role assignments - benchmark cloud
     new RoleAssignment(this, environment.formatName('role', 'app-cloud-sbns'), {
