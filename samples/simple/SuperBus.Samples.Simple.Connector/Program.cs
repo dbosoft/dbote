@@ -31,7 +31,7 @@ builder.Services.AddRebus((configure, serviceProvider) =>
             new SuperBusCredentials
             {
                 ConnectorId = options.ConnectorId,
-                SigningKey = options.Authentication.GetSigningKey(),
+                SigningKey = options.GetSigningKey(),
                 TenantId = options.TenantId,
             }))
         .Serialization(s => s.UseSystemTextJson())

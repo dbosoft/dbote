@@ -7,7 +7,11 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
 $acr = 'acrsuperbustest-czbddsczaug6adgm.azurecr.io'
+$acrName = 'acrsuperbustest'
 $artifactsPath = Join-Path $PSScriptRoot 'artifacts'
+
+az acr login --name $acrName
+
 try {
     Push-Location ../src/workers/src/SuperBus.SuperBusWorker
     dotnet publish -c Release -r linux-x64 -o (Join-Path $artifactsPath 'SuperBus.SuperBusWorker')

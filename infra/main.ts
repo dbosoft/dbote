@@ -105,7 +105,7 @@ class SuperBusStack extends TerraformStack {
       location,
       resourceGroupName,
       sku: {
-        name: 'Free_F1',
+        name: 'Standard_S1',
         capacity: 1,
       },
       identity:{
@@ -114,7 +114,6 @@ class SuperBusStack extends TerraformStack {
       serviceMode: 'Serverless',
       upstreamEndpoint: [
         {
-          // TODO Use proper authentication instead of function key
           urlTemplate: worker.signalREndpoint,
           eventPattern: ['*'],
           hubPattern: ['*'],

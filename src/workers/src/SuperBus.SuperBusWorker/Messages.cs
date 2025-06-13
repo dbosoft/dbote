@@ -108,15 +108,14 @@ internal class Messages(
             // TODO fix error handling
             throw new InvalidOperationException("Missing tenant_id or connector_id in message properties.");
 
-        var storageConnection = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
-        var queue = new QueueClient(storageConnection, $"{storageOptions.Value.Prefix}-{tenantId}-{connectorId}");
-        await queue.CreateAsync();
+        var queueClient = queueServiceClient.GetQueueClient($"{storageOptions.Value.Prefix}-{tenantId}-{connectorId}");
+        await queueClient.CreateAsync();
 
         // TODO validate headers?
 
         var superBusMessage = messageConverter.ToSuperBus(message);
 
-        var receipt = await queue.SendMessageAsync(JsonSerializer.Serialize(superBusMessage));
+        var receipt = await queueClient.SendMessageAsync(JsonSerializer.Serialize(superBusMessage));
 
         await Clients.All.NewMessage(receipt.Value.MessageId);
     }

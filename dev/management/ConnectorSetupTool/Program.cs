@@ -14,7 +14,7 @@ builder.Services.AddAzureClients(clientBuilder =>
 {
     clientBuilder.UseCredential(new DefaultAzureCredential());
 
-    clientBuilder.AddTableServiceClient(builder.Configuration["StorageConnection"]);
+    clientBuilder.AddTableServiceClient(builder.Configuration.GetSection("StorageConnection"));
 });
 
 using var host = builder.Build();

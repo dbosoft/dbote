@@ -87,7 +87,7 @@ internal class SignalRClient(
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = subject,
-            Expires = DateTime.UtcNow.AddMinutes(30),
+            Expires = DateTime.UtcNow.AddMinutes(5),
             SigningCredentials = signingCredentials,
             Audience = endpointUri.ToString(),
             Issuer = clientId,
