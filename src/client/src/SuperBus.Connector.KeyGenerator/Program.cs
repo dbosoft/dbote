@@ -1,38 +1,12 @@
-﻿// See https://aka.ms/new-console-template for more information
-
-using System.ComponentModel.DataAnnotations;
+﻿using System.Reflection;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using SuperBus.Connector.KeyGenerator;
 
-Console.WriteLine("Hello, World!");
+var keyInfo = new KeyGenerator().GenerateKey();
 
-
-using var ecdsa = ECDsa.Create(ECCurve.CreateFromFriendlyName("secp256r1"));
-
-var ecdsaPublickey = ECDsa.Create();
-ecdsaPublickey.ImportSubjectPublicKeyInfo(ecdsa.ExportSubjectPublicKeyInfo(), out _);
-
-var securityKey = new ECDsaSecurityKey(ecdsa);
-var securityPublicKey = new ECDsaSecurityKey(ecdsaPublickey);
-
-var jsonKey = JsonWebKeyConverter.ConvertFromECDsaSecurityKey(securityKey);
-var publicJsonWebKey = JsonWebKeyConverter.ConvertFromECDsaSecurityKey(securityPublicKey);
-
-/*
-var privateJson = Js
-
-securityKey.PrivateKeyStatus
-var jsonWebKey = JsonWebKeyConverter.ConvertFromECDsaSecurityKey(securityKey);
-
-jsonWebKey.
-
-signingCredentials.
-securityKey.
-var signingKey = 
-
-    @{
-    PublicKey = [System.Convert]::ToBase64String($ecdsa.ExportSubjectPublicKeyInfo())
-    PrivateKey = [System.Convert]::ToBase64String($ecdsa.ExportPkcs8PrivateKey())
-}
-*/
+Console.WriteLine("Key pair for SuperBus connector:");
+Console.WriteLine($"Key ID: {keyInfo.KeyId}");
+Console.WriteLine($"Public Key: {keyInfo.PublicKey}");
+Console.WriteLine($"Private Key: {keyInfo.PrivateKey}");

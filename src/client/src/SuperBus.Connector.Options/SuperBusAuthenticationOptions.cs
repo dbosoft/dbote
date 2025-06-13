@@ -8,8 +8,9 @@ namespace SuperBus.Connector.Options;
 
 public class SuperBusAuthenticationOptions
 {
-
     public SuperBusAuthenticationType AuthenticationType { get; set; }
+
+    public string KeyId { get; set; }
 
     public string? SigningKey { get; set; }
 }
