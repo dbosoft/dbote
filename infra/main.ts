@@ -184,6 +184,10 @@ class SuperBusStack extends TerraformStack {
 
     // app config - worker
 
+    // The SignalR and Azure Service Bus configuration cannot be placed
+    // in the App Configuration Service as the Azure Function host parses
+    // them to setup the triggers.
+    // TODO use managed identity for table and queue storage
     worker.addAppSetting('SuperBus__Worker__Storage__Connection', storageAccount.primaryConnectionString);
     worker.addAppSetting('SuperBus__Worker__ServiceBus__Connection__fullyQualifiedNamespace', fullyQualifiedNamespace);
     worker.addAppSetting('SuperBus__Worker__ServiceBus__Connection__credential', 'managedidentity');

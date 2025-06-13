@@ -5,11 +5,9 @@ import { StorageContainer } from "@cdktf/provider-azurerm/lib/storage-container"
 import { StorageBlob } from "@cdktf/provider-azurerm/lib/storage-blob";
 import { ServicePlan } from "@cdktf/provider-azurerm/lib/service-plan";
 import { FunctionAppFlexConsumption } from "@cdktf/provider-azurerm/lib/function-app-flex-consumption";
-import { DataAzurermFunctionAppHostKeys } from "@cdktf/provider-azurerm/lib/data-azurerm-function-app-host-keys";
 import { RoleAssignment } from "@cdktf/provider-azurerm/lib/role-assignment";
 import { AssetType, TerraformAsset } from "cdktf";
 import { KeyVault } from "@cdktf/provider-azurerm/lib/key-vault";
-import { env } from "process";
 
 export class SuperBusWorker extends Construct {
 
