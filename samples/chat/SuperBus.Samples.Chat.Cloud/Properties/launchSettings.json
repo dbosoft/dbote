@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "SuperBus.Samples.Chat.Cloud": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

@@ -1,21 +1,21 @@
 ﻿using Azure.Core;
-using Rebus.Config;
-using Rebus.Transport;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Azure.Core.Extensions;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration;
+using Rebus.AzureServiceBus;
+using Rebus.Config;
+using Rebus.Transport;
 
 namespace SuperBus.Rebus.Integration;
 
 /// <summary>
-/// 
+/// The <see cref="AzureServiceBusTransport"/> is configured using a connection string
+/// and a <see cref="TokenCredential"/>. These extensions provide a convenient way to
+/// configure the Azure connection using an <see cref="IConfiguration"/> instance
+/// similar to how Azure clients configured for dependency injection.
 /// </summary>
+/// <remarks>
+/// The support for authentication options is limited.
+/// </remarks>
 public static class AzureServiceBusConfigurationExtensions
 {
     public static AzureServiceBusTransportClientSettings UseAzureServiceBusAsOneWayClient(

@@ -1,0 +1,19 @@
+﻿.chatlog {
+    height: 500px;
+    overflow-y: scroll;
+}
+
+.chatinput {
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+}
+
+.chatinput > * {
+    height: 35px;
+}
+
+.chatinput > .chatmessage {
+    flex: 1;
+    margin-right: 8px;
+}
