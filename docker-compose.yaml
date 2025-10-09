@@ -44,7 +44,7 @@ services:
         target: /config/config.json
 
   azurite:
-    image: mcr.microsoft.com/azure-storage/azurite
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
     healthcheck:
       test: ["CMD", "nc", "-z", "127.0.0.1", "10000"]
       interval: 1s
