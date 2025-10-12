@@ -5,7 +5,7 @@
         "Name": "sbemulatorns",
         "Queues": [
           {
-            "Name": "superbus-dev-cloud",
+            "Name": "bote-dev-cloud",
             "Properties": {
               "DeadLetteringOnMessageExpiration": false,
               "DefaultMessageTimeToLive": "PT1H",
@@ -19,7 +19,7 @@
             }
           },
           {
-            "Name": "superbus-dev-connectors",
+            "Name": "bote-dev-connectors",
             "Properties": {
               "DeadLetteringOnMessageExpiration": false,
               "DefaultMessageTimeToLive": "PT1H",
@@ -33,7 +33,7 @@
             }
           },
           {
-            "Name": "superbus-dev-error",
+            "Name": "bote-dev-error",
             "Properties": {
               "DeadLetteringOnMessageExpiration": false,
               "DefaultMessageTimeToLive": "PT1H",
@@ -47,7 +47,7 @@
             }
           },
           {
-            "Name": "superbus-dev-runner",
+            "Name": "bote-dev-runner",
             "Properties": {
               "DeadLetteringOnMessageExpiration": false,
               "DefaultMessageTimeToLive": "PT1H",
@@ -61,7 +61,7 @@
             }
           },
           {
-            "Name": "superbus-dev-service",
+            "Name": "bote-dev-service",
             "Properties": {
               "DeadLetteringOnMessageExpiration": false,
               "DefaultMessageTimeToLive": "PT1H",

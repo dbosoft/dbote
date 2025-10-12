@@ -6,23 +6,23 @@ $PSNativeCommandUseErrorActionPreference = $true
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
-Push-Location ./SuperBus.Benchmark.Cloud
+Push-Location ./Dbosoft.Bote.Benchmark.Cloud
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
-Push-Location ./SuperBus.Benchmark.Connector
+Push-Location ./Dbosoft.Bote.Benchmark.Connector
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
-Push-Location ./SuperBus.Benchmark.Service
+Push-Location ./Dbosoft.Bote.Benchmark.Service
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
-Push-Location ./SuperBus.Benchmark.Runner
+Push-Location ./Dbosoft.Bote.Benchmark.Runner
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
-Push-Location ../../src/workers/src/SuperBus.SuperBusWorker
+Push-Location ../../src/workers/src/Dbosoft.Bote.BoteWorker
 dotnet publish -c Release -r linux-x64
 Pop-Location
 

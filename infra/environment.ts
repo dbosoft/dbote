@@ -1,4 +1,4 @@
-const appName: string = 'superbus'
+const appName: string = 'dbote'
 
 export class Environnment {
 

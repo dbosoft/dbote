@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Dbosoft.Bote.Benchmark.Cloud": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

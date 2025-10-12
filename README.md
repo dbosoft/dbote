@@ -1,4 +1,4 @@
-# SuperBus
+# dbote
 
 ## Local Development
 
@@ -40,18 +40,18 @@ The BasicIdentityProvider is a simple sample implementation that demonstrates th
 - Proper key rotation
 - Integration with organization/tenant management
 
-The SuperBus Worker validates tokens from the BasicIdentityProvider by fetching public keys from its JWKS endpoint.
+The dbote Worker validates tokens from the BasicIdentityProvider by fetching public keys from its JWKS endpoint.
 
 ## Design
 
 ### Flow of a message
 
 #### Cloud -> Connector
-1. Cloud: send message to `superbus-connectors-connector1` with tenant header
+1. Cloud: send message to `bote-connectors-connector1` with tenant header
 2. Rebus pipeline: attach connector ID header
-3. Rebus ASB name formatter: change queue to `superbus-connectors`
-4. SuperBus worker: take message from `superbus-connectors` and copy it to Azure Queue Storage `superbus-tenant1-connector1`
-5. Connector: fetch message from AQS `superbus-tenant1-connector-1`
+3. Rebus ASB name formatter: change queue to `bote-connectors`
+4. dbote worker: take message from `bote-connectors` and copy it to Azure Queue Storage `bote-tenant1-connector1`
+5. Connector: fetch message from AQS `bote-tenant1-connector-1`
 
 ## Important Technical Decisions
 
@@ -65,7 +65,7 @@ The messages for all connectors of all tenants are handled by a single ASB queue
   event grid triggers. Event grid triggers are only available in the premium SKU of ASB.
 
 ### Connector authentication
-The connectors authenticate to the SuperBus infrastructure with a client assertion JWT which
+The connectors authenticate to the dbote infrastructure with a client assertion JWT which
 is signed with a ECDSA key which is unique to the connector.
 
 #### Reasons

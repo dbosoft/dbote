@@ -1,0 +1,19 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "dbote__Worker__Storage__Connection": "UseDevelopmentStorage=true",
+    "dbote__Worker__Storage__Prefix": "bote-dev",
+    "dbote__Worker__ServiceBus__Connection": "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;",
+    "dbote__Worker__ServiceBus__Queues__Cloud": "bote-dev-cloud",
+    "dbote__Worker__ServiceBus__Queues__Error": "bote-dev-error",
+    "dbote__Worker__ServiceBus__Queues__Connectors": "bote-dev-connectors",
+    "dbote__Worker__ServiceBus__Queues__Events": "bote-dev-events",
+    "dbote__Worker__SignalR__Connection": "Endpoint=http://localhost;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;",
+    "dbote__Worker__OpenId__Authority": "http://localhost:7250",
+    "dbote__Worker__OpenId__JwksUri": "http://localhost:7250/api/.well-known/jwks.json",
+    "dbote__Worker__OpenId__Audience": "http://localhost:7249/api",
+    "dbote__Worker__OpenId__RequiredScope": "bote"
+  }
+}

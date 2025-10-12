@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="appsettings.Development.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DFrame" Version="1.2.2" />
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Rebus.Async" Version="10.0.0" />
+    <PackageReference Include="Rebus.AzureServiceBus" Version="10.4.1" />
+    <PackageReference Include="Rebus.ServiceProvider" Version="10.3.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Dbosoft.Bote.Options\Dbosoft.Bote.Options.csproj" />
+    <ProjectReference Include="..\..\..\src\Dbosoft.Bote.Rebus.Integration\Dbosoft.Bote.Rebus.Integration.csproj" />
+    <ProjectReference Include="..\Dbosoft.Bote.Benchmark.Messages\Dbosoft.Bote.Benchmark.Messages.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,6 +1,6 @@
-# SuperBus Chat Sample
+# dbote Chat Sample
 
-A multi-tenant chat application demonstrating SuperBus's tenant isolation and real-time messaging capabilities.
+A multi-tenant chat application demonstrating dbote's tenant isolation and real-time messaging capabilities.
 
 ## Demo Scenarios
 
@@ -24,7 +24,7 @@ docker compose up --build
   - **Tenant A - Connector B**: http://localhost:5001
   - **Tenant B - Connector A**: http://localhost:5002
 - Cloud service (message relay)
-- SuperBus infrastructure (worker, identity provider, storage, service bus)
+- dbote infrastructure (worker, identity provider, storage, service bus)
 
 **Demo Flow:**
 1. Open http://localhost:5000 and http://localhost:5001 in separate browser windows
@@ -54,7 +54,7 @@ docker compose up -d
 # Wait for services to be healthy (~30 seconds)
 docker compose ps
 
-# From samples/chat/SuperBus.Samples.Chat.Connector directory
+# From samples/chat/Dbosoft.Bote.Samples.Chat.Connector directory
 dotnet run
 ```
 
@@ -62,14 +62,14 @@ dotnet run
 Edit `appsettings.Development.json` to change tenant/connector:
 ```json
 {
-  "SuperBus": {
+  "dbote": {
     "Connector": {
       "TenantId": "tenant-a",        // Change this
       "ConnectorId": "connector-a",  // Change this
       "Authentication": {
         "Authority": "http://localhost:7250",
         "TokenEndpoint": "http://localhost:7250/api/tenant-a/token",  // Match tenant
-        "Scope": "superbus",
+        "Scope": "dbote",
         "SigningKey": "..."
       }
     }
@@ -91,7 +91,7 @@ Edit `appsettings.Development.json` to change tenant/connector:
 └──────────┬──────────┘     └──────────┬──────────┘     └──────────┬──────────┘
            │                           │                           │
            │ ┌─────────────────────────┴───────────────────────┐   │
-           └─►  SuperBus Worker                                 ◄───┘
+           └─►  dbote Worker                                    ◄───┘
              │  - Routes messages by tenant                     │
              │  - Enforces tenant isolation                     │
              └──────────────────┬───────────────────────────────┘
@@ -133,7 +133,7 @@ Each connector authenticates with:
 - **Tenant-specific token endpoint**: `/api/{tenantId}/token`
 - **Standards-compliant OAuth 2.0 flow** (RFC 7523)
 
-The SuperBus Worker:
+The dbote Worker:
 - Validates all JWTs against the identity provider's JWKS
 - Injects authenticated tenant/connector identity into messages
 - **Prevents header injection attacks** (connectors cannot spoof identity)

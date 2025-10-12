@@ -60,7 +60,7 @@ services:
 
   storage-init:
     build:
-      context: ./src/workers/src/SuperBus.StorageInit
+      context: ./src/workers/src/Dbosoft.Bote.StorageInit
     restart: "no"
     depends_on:
       azurite:

@@ -1,0 +1,20 @@
+{
+  "profiles": {
+    "Dbosoft.Bote.Samples.Chat.Cloud": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    "Chat Sample (Docker)": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "dbote__Cloud__Servicebus__Connection": "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;",
+        "dbote__Cloud__ServiceBus__Queues__Cloud": "bote-sample-chat-cloud",
+        "dbote__Cloud__ServiceBus__Queues__Connectors": "bote-sample-chat-connectors",
+        "dbote__Cloud__ServiceBus__Queues__Error": "bote-sample-chat-error"
+      }
+    }
+  }
+}

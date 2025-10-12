@@ -33,7 +33,7 @@ configs:
               "Name": "sbemulatorns",
               "Queues": [
                 {
-                  "Name": "superbus-sample-simple-cloud",
+                  "Name": "bote-sample-simple-cloud",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",
@@ -47,7 +47,7 @@ configs:
                   }
                 },
                 {
-                  "Name": "superbus-sample-simple-error",
+                  "Name": "bote-sample-simple-error",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",
@@ -61,7 +61,7 @@ configs:
                   }
                 },
                 {
-                  "Name": "superbus-sample-simple-connectors",
+                  "Name": "bote-sample-simple-connectors",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",
@@ -75,7 +75,7 @@ configs:
                   }
                 },
                 {
-                  "Name": "superbus-sample-simple-events",
+                  "Name": "bote-sample-simple-events",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",
@@ -104,7 +104,7 @@ configs:
           "Templates":
           [
             {
-              "UrlTemplate": "http://superbus-worker/runtime/webhooks/signalr?code=master-secret",
+              "UrlTemplate": "http://dbote-worker/runtime/webhooks/signalr?code=master-secret",
               "EventPattern": "*",
               "HubPattern": "*",
               "CategoryPattern": "*"

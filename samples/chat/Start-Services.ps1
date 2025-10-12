@@ -6,26 +6,26 @@ $PSNativeCommandUseErrorActionPreference = $true
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
-Write-Host "Building SuperBus Chat Sample..." -ForegroundColor Cyan
+Write-Host "Building Bote Chat Sample..." -ForegroundColor Cyan
 Write-Host ""
 
-Push-Location ./SuperBus.Samples.Chat.Cloud
+Push-Location ./Dbosoft.Bote.Samples.Chat.Cloud
 Write-Host "Publishing Cloud service..." -ForegroundColor Yellow
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
-Push-Location ./SuperBus.Samples.Chat.Connector
+Push-Location ./Dbosoft.Bote.Samples.Chat.Connector
 Write-Host "Publishing Chat Connector..." -ForegroundColor Yellow
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
-Push-Location ../../src/workers/src/SuperBus.BasicIdentityProvider
+Push-Location ../../src/workers/src/Dbosoft.Bote.BasicIdentityProvider
 Write-Host "Publishing BasicIdentityProvider..." -ForegroundColor Yellow
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
-Push-Location ../../src/workers/src/SuperBus.SuperBusWorker
-Write-Host "Publishing SuperBusWorker..." -ForegroundColor Yellow
+Push-Location ../../src/workers/src/Dbosoft.Bote.BoteWorker
+Write-Host "Publishing BoteWorker..." -ForegroundColor Yellow
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
@@ -37,7 +37,7 @@ Write-Host ""
 Write-Host "Starting services..." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Green
-Write-Host "  SuperBus Chat Multi-Tenant Demo" -ForegroundColor Green
+Write-Host "  Bote Chat Multi-Tenant Demo" -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Once started, open these URLs in your browser:" -ForegroundColor Cyan

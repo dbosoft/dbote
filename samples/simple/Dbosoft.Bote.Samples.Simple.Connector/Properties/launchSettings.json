@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Dbosoft.Bote.Samples.Simple.Connector": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

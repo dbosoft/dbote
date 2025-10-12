@@ -8,15 +8,15 @@ import { RoleAssignment } from "@cdktf/provider-azurerm/lib/role-assignment";
 import { ServicebusQueue } from "@cdktf/provider-azurerm/lib/servicebus-queue";
 import { AppConfiguration } from "@cdktf/provider-azurerm/lib/app-configuration";
 import { AppConfigurationKey } from "@cdktf/provider-azurerm/lib/app-configuration-key";
-import { SuperBusInsights } from "./constructs/superbus-insights";
+import { DboteInsights } from "./constructs/dbote-insights";
 import { Environnment } from "./environment";
-import { SuperBusWorker } from "./constructs/superbus-worker";
+import { DboteWorker } from "./constructs/dbote-worker";
 import { StorageTable } from "@cdktf/provider-azurerm/lib/storage-table";
-import { StorageTableEntity } from "@cdktf/provider-azurerm/lib/storage-table-entity";
-import { SuperBusBenchmark } from "./constructs/superbus-benchmark";
+import { DboteBenchmark } from "./constructs/dbote-benchmark";
+import { DboteIdentityProvider } from "./constructs/dbote-identity-provider";
 
 const location = "westeurope"; // Define the location for resources
-const resourceGroupName = "rg-superbus-test"; // Define the resource group name
+const resourceGroupName = "rg-dbote-test"; // Define the resource group name
 const tenantId = 'cb0bb315-f38b-4ab4-ad2d-d3ed25d23b53';
 const subscriptionId = '48b9d140-b453-4053-9fe1-a46509808c7f';
 
@@ -30,7 +30,7 @@ function sanitizeName(name: string): string {
 }
 
 
-class SuperBusStack extends TerraformStack {
+class DboteStack extends TerraformStack {
   constructor(scope: Construct, id: string) {
     super(scope, id);
 
@@ -47,7 +47,7 @@ class SuperBusStack extends TerraformStack {
 
     const environment = new Environnment(tenantId, location, resourceGroupName, 'cmdev');
 
-    const insights = new SuperBusInsights(this, environment);
+    const insights = new DboteInsights(this, environment);
 
     const appConfiguration = new AppConfiguration(this, environment.formatName('appcs'), {
       name: environment.formatName('appcs'),
@@ -56,11 +56,20 @@ class SuperBusStack extends TerraformStack {
       sku: 'developer',
     });
 
-    const worker = new SuperBusWorker(this, environment, appConfiguration.endpoint, insights.connection);
-    const benchmark = new SuperBusBenchmark(this, environment, appConfiguration.endpoint, insights.connection);
+    // Deploy BasicIdentityProvider (with in-memory connector storage)
+    const identityProvider = new DboteIdentityProvider(this, environment, insights.connection);
+
+    const worker = new DboteWorker(this, environment, appConfiguration.endpoint, insights.connection);
+
+    // Audience is just a logical identifier that must match between issuer and validator
+    const audience = 'http://dbote-worker/api';
+
+    identityProvider.addAppSetting('BasicIdentityProvider__Audience', audience);
+
+    const benchmark = new DboteBenchmark(this, environment, appConfiguration.endpoint, insights.connection);
 
     // Service Bus
-    const serviceBusNamespaceName = formatName('sbns', 'superbus', 'cmdev', false);
+    const serviceBusNamespaceName = formatName('sbns', 'dbote', 'cmdev', false);
     const serviceBusNamespace = new ServicebusNamespace(this, serviceBusNamespaceName, {
       location,
       resourceGroupName,
@@ -98,8 +107,13 @@ class SuperBusStack extends TerraformStack {
       name: environment.formatName('sbq', 'service'),
     });
 
+    const eventsQueue = new ServicebusQueue(this, environment.formatName('sbq', 'events'), {
+      namespaceId: serviceBusNamespace.id,
+      name: environment.formatName('sbq', 'events'),
+    });
+
     // SignalR
-    const signalrServiceName = environment.formatName('signalr', 'superbus');
+    const signalrServiceName = environment.formatName('signalr', 'dbote');
     const signalrService = new SignalrService(this, signalrServiceName, {
       name: signalrServiceName,
       location,
@@ -137,18 +151,10 @@ class SuperBusStack extends TerraformStack {
       accountReplicationType: "LRS",
     });
 
-    const table = new StorageTable(this, environment.formatName('stt'), {
+    // Create subscriptions table for BoteWorker topic subscriptions
+    new StorageTable(this, environment.formatName('stt', 'subscriptions'), {
       storageAccountName: storageAccount.name,
-      name: 'superbusconnectors',
-    })
-
-    new StorageTableEntity(this, environment.formatName('stte'), {
-      storageTableId: table.id,
-      partitionKey: 'TENANT-A',
-      rowKey: 'CONNECTOR-A',
-      entity:  {
-        'PublicKey': 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDSfgIieGaVTF7RLRoo0HH/xUjg3T8jHr1RkxeRBqwy7lAGBG6Y4Pnlka0qqVARrx3TVuMHhmRSQnu1KfFgKnuA==',
-      },
+      name: 'subscriptions',
     });
 
     // role assignments - worker
@@ -182,82 +188,90 @@ class SuperBusStack extends TerraformStack {
       principalId: worker.functionPrincipalId,
     });
 
+    // Note: The above role assignment covers access to all tables in the storage account,
+    // including the subscriptions table created above
+
     // app config - worker
 
     // The SignalR and Azure Service Bus configuration cannot be placed
     // in the App Configuration Service as the Azure Function host parses
     // them to setup the triggers.
     // TODO use managed identity for table and queue storage
-    worker.addAppSetting('SuperBus__Worker__Storage__Connection', storageAccount.primaryConnectionString);
-    worker.addAppSetting('SuperBus__Worker__ServiceBus__Connection__fullyQualifiedNamespace', fullyQualifiedNamespace);
-    worker.addAppSetting('SuperBus__Worker__ServiceBus__Connection__credential', 'managedidentity');
-    worker.addAppSetting('SuperBus__Worker__ServiceBus__Queues__Cloud', cloudQueue.name);
-    worker.addAppSetting('SuperBus__Worker__ServiceBus__Queues__Connectors', connectorsQueue.name);
-    worker.addAppSetting('SuperBus__Worker__ServiceBus__Queues__Error', errorQueue.name);
-    worker.addAppSetting('SuperBus__Worker__SignalR__Connection__serviceUri', `https://${signalrServiceName}.service.signalr.net`);
-    worker.addAppSetting('SuperBus__Worker__SignalR__Connection__credential', 'managedidentity');
+    worker.addAppSetting('dbote__Worker__Storage__Connection', storageAccount.primaryConnectionString);
+    worker.addAppSetting('dbote__Worker__ServiceBus__Connection__fullyQualifiedNamespace', fullyQualifiedNamespace);
+    worker.addAppSetting('dbote__Worker__ServiceBus__Connection__credential', 'managedidentity');
+    worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Cloud', cloudQueue.name);
+    worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Connectors', connectorsQueue.name);
+    worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Error', errorQueue.name);
+    worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Events', eventsQueue.name);
+    worker.addAppSetting('dbote__Worker__SignalR__Connection__serviceUri', `https://${signalrServiceName}.service.signalr.net`);
+    worker.addAppSetting('dbote__Worker__SignalR__Connection__credential', 'managedidentity');
+    worker.addAppSetting('dbote__Worker__OpenId__Authority', identityProvider.endpoint);
+    worker.addAppSetting('dbote__Worker__OpenId__JwksUri', `${identityProvider.endpoint}/.well-known/jwks.json`);
+    worker.addAppSetting('dbote__Worker__OpenId__Audience', audience);
+    worker.addAppSetting('dbote__Worker__OpenId__RequiredScope', 'bote');
 
 /*
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-storage-connection'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Worker:Storage:Connection',
+      key: 'dbote:Worker:Storage:Connection',
       value: storageAccount.primaryConnectionString,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-namespace'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Worker:ServiceBus:Connection:fullyQualifiedNamespace',
+      key: 'dbote:Worker:ServiceBus:Connection:fullyQualifiedNamespace',
       value: fullyQualifiedNamespace,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-credentialtype'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Worker:ServiceBus:Connection:credential',
+      key: 'dbote:Worker:ServiceBus:Connection:credential',
       value: 'managedidentity',
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-queue-cloud'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Worker:ServiceBus:Queues:Cloud',
+      key: 'dbote:Worker:ServiceBus:Queues:Cloud',
       value: cloudQueue.name,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-queue-connectors'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Worker:ServiceBus:Queues:Connectors',
+      key: 'dbote:Worker:ServiceBus:Queues:Connectors',
       value: connectorsQueue.name,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-queue-error'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Worker:ServiceBus:Queues:Error',
+      key: 'dbote:Worker:ServiceBus:Queues:Error',
       value: errorQueue.name,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-signalr-serviceuri'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Worker:SignalR:Connection:serviceUri',
+      key: 'dbote:Worker:SignalR:Connection:serviceUri',
       value: `https://${signalrService.hostname}`,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-signalr-credentialtype'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Worker:SignalR:Connection:credential',
+      key: 'dbote:Worker:SignalR:Connection:credential',
       value: 'managedidentity',
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'func-openid-authority'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Worker:OpenId:Authority',
-      value: worker.superBusEndpoint,
+      key: 'dbote:Worker:OpenId:Authority',
+      value: worker.dboteEndpoint,
       label: environment.environment,
     });
 */
@@ -279,43 +293,50 @@ class SuperBusStack extends TerraformStack {
     // app config - benchmark cloud
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-namespace'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Cloud:ServiceBus:Connection:fullyQualifiedNamespace',
+      key: 'dbote:Cloud:ServiceBus:Connection:fullyQualifiedNamespace',
       value: fullyQualifiedNamespace,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-credentialtype'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Cloud:ServiceBus:Connection:credential',
+      key: 'dbote:Cloud:ServiceBus:Connection:credential',
       value: 'managedidentity',
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-cloud'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Cloud:ServiceBus:Queues:Cloud',
+      key: 'dbote:Cloud:ServiceBus:Queues:Cloud',
       value: cloudQueue.name,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-connectors'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Cloud:ServiceBus:Queues:Connectors',
+      key: 'dbote:Cloud:ServiceBus:Queues:Connectors',
       value: connectorsQueue.name,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-error'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Cloud:ServiceBus:Queues:Error',
+      key: 'dbote:Cloud:ServiceBus:Queues:Error',
       value: errorQueue.name,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-service'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Cloud:ServiceBus:Queues:Service',
+      key: 'dbote:Cloud:ServiceBus:Queues:Service',
       value: serviceQueue.name,
+      label: environment.environment,
+    });
+
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-events'), {
+      configurationStoreId: appConfiguration.id,
+      key: 'dbote:Cloud:ServiceBus:Queues:Events',
+      value: eventsQueue.name,
       label: environment.environment,
     });
 
@@ -335,35 +356,35 @@ class SuperBusStack extends TerraformStack {
     // app config - benchmark service
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-namespace'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Service:ServiceBus:Connection:fullyQualifiedNamespace',
+      key: 'dbote:Service:ServiceBus:Connection:fullyQualifiedNamespace',
       value: fullyQualifiedNamespace,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-credentialtype'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Service:ServiceBus:Connection:credential',
+      key: 'dbote:Service:ServiceBus:Connection:credential',
       value: 'managedidentity',
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-queue-cloud'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Service:ServiceBus:Queues:Cloud',
+      key: 'dbote:Service:ServiceBus:Queues:Cloud',
       value: cloudQueue.name,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-queue-error'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Service:ServiceBus:Queues:Error',
+      key: 'dbote:Service:ServiceBus:Queues:Error',
       value: errorQueue.name,
       label: environment.environment,
     });
 
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-queue-service'), {
       configurationStoreId: appConfiguration.id,
-      key: 'SuperBus:Service:ServiceBus:Queues:Service',
+      key: 'dbote:Service:ServiceBus:Queues:Service',
       value: serviceQueue.name,
       label: environment.environment,
     });
@@ -371,12 +392,12 @@ class SuperBusStack extends TerraformStack {
 }
 
 const app = new App();
-const stack = new SuperBusStack(app, "infra");
+const stack = new DboteStack(app, "infra");
 
 new AzurermBackend(stack, {
-  resourceGroupName: 'rg-superbus-test',
-  storageAccountName: 'stsuperbustfstate',
+  resourceGroupName: 'rg-dbote-test',
+  storageAccountName: 'stdbotestfstate',
   containerName: 'tfstate',
-  key: 'superbus.tfstate',
+  key: 'dbote.tfstate',
 });
 app.synth();

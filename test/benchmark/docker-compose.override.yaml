@@ -2,7 +2,7 @@ services:
   connector-init:
     environment:
       "IdentityProviderUrl": "http://basicidentityprovider"
-  
+
   runner:
     ports:
     - "7312:7312"
@@ -26,7 +26,7 @@ configs:
               "Name": "sbemulatorns",
               "Queues": [
                 {
-                  "Name": "superbus-benchmark-cloud",
+                  "Name": "bote-benchmark-cloud",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",
@@ -40,7 +40,7 @@ configs:
                   }
                 },
                 {
-                  "Name": "superbus-benchmark-error",
+                  "Name": "bote-benchmark-error",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",
@@ -54,7 +54,7 @@ configs:
                   }
                 },
                 {
-                  "Name": "superbus-benchmark-runner",
+                  "Name": "bote-benchmark-runner",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",
@@ -68,7 +68,7 @@ configs:
                   }
                 },
                 {
-                  "Name": "superbus-benchmark-service",
+                  "Name": "bote-benchmark-service",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",
@@ -82,7 +82,7 @@ configs:
                   }
                 },
                 {
-                  "Name": "superbus-benchmark-connectors",
+                  "Name": "bote-benchmark-connectors",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",
@@ -111,7 +111,7 @@ configs:
           "Templates":
           [
             {
-              "UrlTemplate": "http://superbus-worker/runtime/webhooks/signalr?code=master-secret",
+              "UrlTemplate": "http://dbote-worker/runtime/webhooks/signalr?code=master-secret",
               "EventPattern": "*",
               "HubPattern": "*",
               "CategoryPattern": "*"
