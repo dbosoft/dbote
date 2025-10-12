@@ -11,7 +11,6 @@ using Microsoft.Extensions.Logging;
 using SuperBus.AppConfiguration;
 using SuperBus.SuperBusWorker;
 using SuperBus.SuperBusWorker.Converters;
-using SuperBus.Management.Persistence;
 using SuperBus.Options;
 
 var builder = FunctionsApplication.CreateBuilder(args);
@@ -43,16 +42,15 @@ builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection("Sup
 builder.Services.AddServerlessHub<Messages>();
 
 builder.Services.AddSingleton<IMessageConverter, MessageConverter>();
-builder.Services.AddSingleton<ITokenCredentialsProvider, TokenCredentialsProvider>();
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<ITokenValidationService, TokenValidationService>();
 
 builder.Services.AddAzureClients(clientBuilder =>
 {
     clientBuilder.UseCredential(new DefaultAzureCredential());
     clientBuilder.AddServiceBusClient(builder.Configuration.GetSection("SuperBus:Worker:ServiceBus:Connection"));
-    clientBuilder.AddTableServiceClient(builder.Configuration.GetSection("SuperBus:Worker:Storage:Connection"));
     clientBuilder.AddQueueServiceClient(builder.Configuration.GetSection("SuperBus:Worker:Storage:Connection"));
+    clientBuilder.AddTableServiceClient(builder.Configuration.GetSection("SuperBus:Worker:Storage:Connection"));
 });
-
-builder.Services.AddTableStorage(builder.Configuration["SuperBus:Worker:Storage:Prefix"]);
 
 builder.Build().Run();

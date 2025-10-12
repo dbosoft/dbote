@@ -2,6 +2,8 @@ services:
   service-bus:
     hostname: servicebus
     image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    ports:
+      - "5672:5672"  # AMQP port for Service Bus messaging
     configs:
       - source: servicebus
         target: /ServiceBus_Emulator/ConfigFiles/Config.json
@@ -39,30 +41,32 @@ services:
     hostname: servicebus
     build:
       context: ./dev/asbapi
+    ports:
+      - "80:80"  # Service Bus management API
     configs:
       - source: servicebus
         target: /config/config.json
 
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    ports:
+      - "10000:10000"  # Blob service
+      - "10001:10001"  # Queue service
+      - "10002:10002"  # Table service
     healthcheck:
       test: ["CMD", "nc", "-z", "127.0.0.1", "10000"]
       interval: 1s
       retries: 30
 
-  azurite-init:
+  storage-init:
     build:
-      context: ./dev/management
-    configs:
-      - source: connectors
-        target: /import/connectors.json
+      context: ./src/workers/src/SuperBus.StorageInit
+    restart: "no"
     depends_on:
       azurite:
         condition: service_healthy
     environment:
-      # Use the full Azurite connection string as we need to change the host
-      "StorageConnection": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
-      "StoragePrefix": "superbus-dev"
+      "AZURE_STORAGE_CONNECTION_STRING": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;"
 
   signalr:
     build:

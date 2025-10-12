@@ -14,15 +14,24 @@ public class ChatRequestHandler(
 {
     public async Task Handle(ChatRequest message)
     {
-        logger.LogInformation("Handling chat request from connector {ConnectorId} of tenant {TenantId},",
-            MessageContext.Current.Headers[SuperBusHeaders.TenantId],
-            MessageContext.Current.Headers[SuperBusHeaders.ConnectorId]);
-        
-        await bus.Reply(new ChatResponse()
+        var tenantId = MessageContext.Current.Headers[SuperBusHeaders.TenantId];
+        var senderConnectorId = MessageContext.Current.Headers[SuperBusHeaders.ConnectorId];
+
+        logger.LogInformation("Broadcasting chat from connector {ConnectorId} of tenant {TenantId}",
+            senderConnectorId, tenantId);
+
+        // Send ONE message with Topic header
+        // Worker will store it and notify SignalR group
+        // Active connectors in group will request and receive the message
+        await bus.Send(new ChatResponse()
         {
             Id = message.Id,
-            Author = MessageContext.Current.Headers[SuperBusHeaders.ConnectorId],
-            Message = $"ECHO: {message.Message}",
+            Author = senderConnectorId,
+            Message = message.Message,
+        }, new Dictionary<string, string>()
+        {
+            [SuperBusHeaders.TenantId] = tenantId,
+            [SuperBusHeaders.Topic] = "chat",
         });
     }
 }

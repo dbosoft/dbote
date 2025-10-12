@@ -1,0 +1,114 @@
+services:
+  connector-init:
+    environment:
+      "IdentityProviderUrl": "http://basicidentityprovider"
+
+configs:
+  connectors:
+    content: |
+      [
+        {
+          "TenantId": "tenant-a",
+          "ConnectorId": "connector-a",
+          "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDSfgIieGaVTF7RLRoo0HH/xUjg3T8jHr1RkxeRBqwy7lAGBG6Y4Pnlka0qqVARrx3TVuMHhmRSQnu1KfFgKnuA=="
+        }
+        ,
+        {
+          "TenantId": "tenant-a",
+          "ConnectorId": "connector-b",
+          "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEL3yIgvcG9Cyrzv1KU0pr/Rxrf4N64MEDjYLXeIYupnFXfbhAnLRyb6SGNLlnSm9YE8HIR1JQdi5fY57mS++PkA=="
+        },
+        {
+          "TenantId": "tenant-b",
+          "ConnectorId": "connector-a",
+          "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcu3L06Rb7OoM5va6o+qNPtH6qCNuGoUAWTpkYUAjZCzzW8zOQSXoHY5Uk6OG9+W5f1JVOtU/SKEggSv5QQTx9A=="
+        }
+      ]
+  servicebus:
+    content: |
+      {
+        "UserConfig": {
+          "Namespaces": [
+            {
+              "Name": "sbemulatorns",
+              "Queues": [
+                {
+                  "Name": "superbus-sample-chat-cloud",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "superbus-sample-chat-error",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "superbus-sample-chat-connectors",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "superbus-sample-chat-events",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                }
+              ],
+            }
+          ],
+          "Logging": {
+            "Type": "File"
+          }
+        }
+      }
+  signalr:
+    content: |
+      {
+        "UpstreamSettings":
+        {
+          "Templates":
+          [
+            {
+              "UrlTemplate": "http://superbus-worker/runtime/webhooks/signalr?code=master-secret",
+              "EventPattern": "*",
+              "HubPattern": "*",
+              "CategoryPattern": "*"
+            }
+          ]
+        }
+      }

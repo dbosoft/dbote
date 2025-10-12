@@ -1,8 +1,7 @@
-﻿using Azure.Messaging.ServiceBus;
+﻿using Azure.Data.Tables;
+using Azure.Messaging.ServiceBus;
 using Azure.Storage.Queues;
 using Azure.Storage.Sas;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.SignalRService;
@@ -10,8 +9,6 @@ using Microsoft.Azure.SignalR.Management;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using SuperBus.Abstractions.SignalR;
 using SuperBus.Rebus.Integration;
@@ -19,27 +16,29 @@ using SuperBus.SuperBusWorker.Converters;
 using SuperBus.Transport.Abstractions;
 using System.Net;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text.Json;
-using Microsoft.AspNetCore.Builder;
+using JetBrains.Annotations;
 using SuperBus.Options;
 
 namespace SuperBus.SuperBusWorker;
 
+[PublicAPI]
 [SignalRConnection("SuperBus:Worker:SignalR:Connection")]
 internal class Messages(
     ILogger<Messages> logger,
     IMessageConverter messageConverter,
     IServiceProvider serviceProvider,
-    ITokenCredentialsProvider tokenCredentialsProvider,
-    IOptions<StorageOptions> storageOptions,
+    ITokenValidationService tokenValidationService,
     IOptions<OpenIdOptions> openIdOptions,
+    IOptions<StorageOptions> storageOptions,
     IOptions<ServiceBusOptions> serviceBusOptions,
     QueueServiceClient queueServiceClient,
-    ServiceBusClient serviceBusClient)
+    ServiceBusClient serviceBusClient,
+    TableServiceClient tableServiceClient)
     : ServerlessHub<IMessages>(serviceProvider)
 {
     private const string HubName = nameof(Messages);
+    private const string SubscriptionsTableName = "subscriptions";
 
     [Function("negotiate")]
     public async Task<HttpResponseData> Negotiate(
@@ -54,42 +53,45 @@ internal class Messages(
 
         var jwt = authHeader.Substring("Bearer ".Length);
 
-        // TODO Should use a proper token endpoint
-
-        var tokenCredentials = tokenCredentialsProvider.GetCredentials();
-        var handler = new JsonWebTokenHandler();
-        var validationResult = await handler.ValidateTokenAsync(jwt, new TokenValidationParameters()
-        {
-            ValidIssuer = openIdOptions.Value.Authority,
-            ValidAudience = openIdOptions.Value.Authority,
-            IssuerSigningKey = tokenCredentials.Key,
-        });
+        var validationResult = await tokenValidationService.ValidateAccessToken(jwt, req.FunctionContext.CancellationToken);
 
         if (!validationResult.IsValid)
         {
-            logger.LogDebug(validationResult.Exception, "Validation of client assertion token failed: ");
+            logger.LogDebug(validationResult.Exception, "Token validation failed");
             return req.CreateResponse(HttpStatusCode.Unauthorized);
         }
 
         var token = (JsonWebToken)validationResult.SecurityToken;
-        if (!token.TryGetValue(ClaimNames.TenantId, out string tenantId)
-            || !token.TryGetValue(ClaimNames.ConnectorId, out string connectorId)
-            || !token.TryGetValue("scope", out string scope)
-            || scope != "superbus")
+
+        // Extract connector identity from standard JWT claims
+        if (!ConnectorIdentity.TryExtract(token, out var identity) || identity is null)
         {
-            // TODO proper error handling?
+            logger.LogWarning("Failed to extract connector identity from token");
             return req.CreateResponse(HttpStatusCode.Unauthorized);
+        }
+
+        // Validate required scope (no fallback - must be configured)
+        if (string.IsNullOrEmpty(openIdOptions.Value.RequiredScope))
+        {
+            logger.LogError("RequiredScope is not configured in OpenIdOptions");
+            return req.CreateResponse(HttpStatusCode.InternalServerError);
+        }
+
+        if (!token.TryGetValue("scope", out string scope) || scope != openIdOptions.Value.RequiredScope)
+        {
+            logger.LogWarning("Invalid or missing scope. Expected: {ExpectedScope}, Actual: {ActualScope}",
+                openIdOptions.Value.RequiredScope, scope);
+            return req.CreateResponse(HttpStatusCode.Forbidden);
         }
 
         var negotiateResponse = await NegotiateAsync(new NegotiationOptions
         {
-            UserId = $"{tenantId}-{connectorId}" ,
-            Claims = 
+            UserId = $"{identity.TenantId}-{identity.ConnectorId}",
+            Claims =
             [
-                new Claim(ClaimNames.TenantId, tenantId),
-                new Claim(ClaimNames.ConnectorId, connectorId),
+                new Claim(ClaimNames.TenantId, identity.TenantId),
+                new Claim(ClaimNames.ConnectorId, identity.ConnectorId),
             ],
-            // TODO define values
             CloseOnAuthenticationExpiration = true,
             TokenLifetime = TimeSpan.FromMinutes(15),
         });
@@ -103,21 +105,78 @@ internal class Messages(
         [ServiceBusTrigger("%SuperBus:Worker:ServiceBus:Queues:Connectors%", Connection = "SuperBus:Worker:ServiceBus:Connection")]
         ServiceBusReceivedMessage message)
     {
-        if (!message.ApplicationProperties.TryGetValue(SuperBusHeaders.TenantId, out var tenantId)
-           || !message.ApplicationProperties.TryGetValue(SuperBusHeaders.ConnectorId, out var connectorId))
-            // TODO fix error handling
-            throw new InvalidOperationException("Missing tenant_id or connector_id in message properties.");
-
-        var queueClient = queueServiceClient.GetQueueClient($"{storageOptions.Value.Prefix}-{tenantId}-{connectorId}");
-        await queueClient.CreateAsync();
-
-        // TODO validate headers?
+        if (!message.ApplicationProperties.TryGetValue(SuperBusHeaders.TenantId, out var tenantId))
+            throw new InvalidOperationException("Missing tenant_id in message properties.");
 
         var superBusMessage = messageConverter.ToSuperBus(message);
 
+        // Check if this is a topic broadcast or targeted message
+        if (message.ApplicationProperties.TryGetValue(SuperBusHeaders.Topic, out var topic))
+        {
+            // TOPIC BROADCAST MODE: Query subscriptions and send to each subscriber
+            var subscriptionsTable = tableServiceClient.GetTableClient(SubscriptionsTableName);
+            var partitionKey = SubscriptionKeyFormatter.CreatePartitionKey(tenantId.ToString()!, topic.ToString()!);
+
+            var subscribers = subscriptionsTable.Query<TableEntity>(
+                filter: $"PartitionKey eq '{partitionKey}'");
+
+            var subscriberCount = 0;
+            var staleSubscriptions = new List<string>();
+
+            foreach (var subscriber in subscribers)
+            {
+                var subConnectorId = subscriber.GetString("ConnectorId");
+                try
+                {
+                    await SendToConnectorQueue(tenantId.ToString()!, subConnectorId, superBusMessage);
+                    subscriberCount++;
+                }
+                catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+                {
+                    // Lazy cleanup: Queue doesn't exist - connector likely deleted
+                    logger.LogInformation(
+                        "Removing stale subscription for {TenantId}/{ConnectorId} on topic {Topic} - queue not found",
+                        tenantId, subConnectorId, topic);
+
+                    try
+                    {
+                        await subscriptionsTable.DeleteEntityAsync(subscriber.PartitionKey, subscriber.RowKey);
+                        staleSubscriptions.Add(subConnectorId);
+                    }
+                    catch (Exception deleteEx)
+                    {
+                        logger.LogWarning(deleteEx,
+                            "Failed to delete stale subscription for {TenantId}/{ConnectorId}",
+                            tenantId, subConnectorId);
+                    }
+                }
+            }
+
+            logger.LogInformation(
+                "Broadcast to topic {Topic} in tenant {TenantId} delivered to {SubscriberCount} subscribers, removed {StaleCount} stale subscriptions",
+                topic, tenantId, subscriberCount, staleSubscriptions.Count);
+        }
+        else if (message.ApplicationProperties.TryGetValue(SuperBusHeaders.ConnectorId, out var connectorId))
+        {
+            // TARGETED MODE: Direct to specific connector queue
+            await SendToConnectorQueue(tenantId.ToString()!, connectorId.ToString()!, superBusMessage);
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "Message must have either Topic (for broadcast) or ConnectorId (for targeted delivery).");
+        }
+    }
+
+    private async Task SendToConnectorQueue(string tenantId, string connectorId, SuperBusMessage superBusMessage)
+    {
+        var queueClient = queueServiceClient.GetQueueClient($"{storageOptions.Value.Prefix}-{tenantId}-{connectorId}");
+        await queueClient.CreateAsync();
+
         var receipt = await queueClient.SendMessageAsync(JsonSerializer.Serialize(superBusMessage));
 
-        await Clients.All.NewMessage(receipt.Value.MessageId);
+        // Notify specific connector via SignalR
+        await Clients.User($"{tenantId}-{connectorId}").NewMessage(receipt.Value.MessageId);
     }
 
     [Function(nameof(GetQueueMetadata))]
@@ -129,8 +188,14 @@ internal class Messages(
             ConnectionStringSetting = "SuperBus:Worker:SignalR:Connection")]
         SignalRInvocationContext invocationContext)
     {
-        invocationContext.Claims.TryGetValue(ClaimNames.TenantId, out var tenantId);
-        invocationContext.Claims.TryGetValue(ClaimNames.ConnectorId, out var connectorId);
+        // Verify claims exist
+        if (!invocationContext.Claims.TryGetValue(ClaimNames.TenantId, out var tenantId) ||
+            !invocationContext.Claims.TryGetValue(ClaimNames.ConnectorId, out var connectorId) ||
+            string.IsNullOrEmpty(tenantId) || string.IsNullOrEmpty(connectorId))
+        {
+            logger.LogError("Missing or invalid required claims in SignalR invocation");
+            throw new UnauthorizedAccessException("Invalid connection claims");
+        }
 
         var queueClient = queueServiceClient.GetQueueClient($"{storageOptions.Value.Prefix}-{tenantId}-{connectorId}");
         await queueClient.CreateAsync();
@@ -158,22 +223,164 @@ internal class Messages(
         string queue,
         SuperBusMessage message)
     {
-        // TODO use common helper for handling queue names
+        // Defense-in-depth: Verify claims exist
+        if (!invocationContext.Claims.TryGetValue(ClaimNames.TenantId, out var tenantId) ||
+            !invocationContext.Claims.TryGetValue(ClaimNames.ConnectorId, out var connectorId) ||
+            string.IsNullOrEmpty(tenantId) || string.IsNullOrEmpty(connectorId))
+        {
+            logger.LogError("Missing or invalid required claims in SignalR invocation");
+            throw new UnauthorizedAccessException("Invalid connection claims");
+        }
+
+        // Validate queue name against whitelist
         var actualQueueName = queue.StartsWith($"{serviceBusOptions.Value.Queues.Connectors}-")
             ? $"{serviceBusOptions.Value.Queues.Connectors}"
             : queue;
 
-        await using var serviceBusSender = serviceBusClient.CreateSender(actualQueueName);
+        // Connectors can only send to Cloud queue or Connectors queue
+        var allowedQueues = new[]
+        {
+            serviceBusOptions.Value.Queues.Cloud,
+            serviceBusOptions.Value.Queues.Connectors
+        };
 
-        // TODO Add whitelist for headers
+        if (!allowedQueues.Contains(actualQueueName))
+        {
+            logger.LogWarning("Connector {TenantId}-{ConnectorId} attempted to send to unauthorized queue: {Queue}",
+                tenantId, connectorId, queue);
+            throw new UnauthorizedAccessException($"Queue '{queue}' is not allowed");
+        }
+
+        // Validate headers - REJECT if connector attempts to inject security-critical headers
+        var blockedHeaders = new[]
+        {
+            SuperBusHeaders.TenantId,
+            SuperBusHeaders.ConnectorId
+        };
+
+        foreach (var blockedHeader in blockedHeaders)
+        {
+            if (!message.Headers.ContainsKey(blockedHeader)) continue;
+            logger.LogError("Connector {TenantId}-{ConnectorId} attempted to inject blocked header: {Header}",
+                tenantId, connectorId, blockedHeader);
+            throw new UnauthorizedAccessException($"Attempted to inject blocked header: {blockedHeader}");
+        }
+
+        await using var serviceBusSender = serviceBusClient.CreateSender(actualQueueName);
 
         var serviceBusMessage = messageConverter.ToServiceBus(message);
 
-        invocationContext.Claims.TryGetValue(ClaimNames.TenantId, out var tenantId);
-        invocationContext.Claims.TryGetValue(ClaimNames.ConnectorId, out var connectorId);
+        // Add authenticated tenant/connector identity to message properties
         serviceBusMessage.ApplicationProperties.Add(SuperBusHeaders.TenantId, tenantId.ToString());
         serviceBusMessage.ApplicationProperties.Add(SuperBusHeaders.ConnectorId, connectorId.ToString());
 
         await serviceBusSender.SendMessageAsync(serviceBusMessage);
     }
+
+    [Function("SubscribeToTopic")]
+    public async Task SubscribeToTopic(
+        [SignalRTrigger(
+            HubName,
+            "messages",
+            nameof(this.SubscribeToTopic),
+            nameof(topicName),
+            ConnectionStringSetting = "SuperBus:Worker:SignalR:Connection")]
+        SignalRInvocationContext invocationContext,
+        string topicName)
+    {
+        try
+        {
+            if (!invocationContext.Claims.TryGetValue(ClaimNames.TenantId, out var tenantIdValues) ||
+                !invocationContext.Claims.TryGetValue(ClaimNames.ConnectorId, out var connectorIdValues) ||
+                string.IsNullOrEmpty(tenantIdValues) || string.IsNullOrEmpty(connectorIdValues))
+            {
+                logger.LogError("Missing or invalid required claims in SignalR invocation");
+                throw new UnauthorizedAccessException("Invalid connection claims");
+            }
+
+            // exception should not happen, just for static check compliance
+            var tenantId = tenantIdValues.ToString() ?? throw new NullReferenceException();
+            var connectorId = connectorIdValues.ToString() ?? throw new NullReferenceException();
+
+
+
+            logger.LogDebug(
+                "SubscribeToTopic called with TenantId='{TenantId}', ConnectorId='{ConnectorId}', TopicName='{TopicName}'",
+                tenantId, connectorId, topicName);
+
+            // Store subscription in table storage with sanitized and hashed keys
+            var subscriptionsTable = tableServiceClient.GetTableClient(SubscriptionsTableName);
+            await subscriptionsTable.CreateIfNotExistsAsync();
+
+            var partitionKey = SubscriptionKeyFormatter.CreatePartitionKey(tenantId, topicName);
+            var rowKey = SubscriptionKeyFormatter.CreateRowKey(connectorId);
+
+            var entity = new TableEntity(partitionKey, rowKey)
+            {
+                ["TenantId"] = tenantId,
+                ["ConnectorId"] = connectorId,
+                ["Topic"] = topicName,
+                ["SubscribedAt"] = DateTime.UtcNow
+            };
+
+            await subscriptionsTable.UpsertEntityAsync(entity);
+
+            logger.LogDebug(
+                "Connector {TenantId}/{ConnectorId} subscribed to topic {Topic} (key: {PartitionKey}/{RowKey})",
+                tenantId, connectorId, topicName, partitionKey, rowKey);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Failed to subscribe to topic. TopicName='{TopicName}', Error: {ErrorMessage}",
+                topicName, ex.Message);
+            throw;
+        }
+    }
+
+    [Function("UnsubscribeFromTopic")]
+    public async Task UnsubscribeFromTopic(
+        [SignalRTrigger(
+            HubName,
+            "messages",
+            nameof(this.UnsubscribeFromTopic),
+            nameof(topicName),
+            ConnectionStringSetting = "SuperBus:Worker:SignalR:Connection")]
+        SignalRInvocationContext invocationContext,
+        string topicName)
+    {
+        if (!invocationContext.Claims.TryGetValue(ClaimNames.TenantId, out var tenantIdValues) ||
+            !invocationContext.Claims.TryGetValue(ClaimNames.ConnectorId, out var connectorIdValues) ||
+            string.IsNullOrEmpty(tenantIdValues) || string.IsNullOrEmpty(connectorIdValues))
+        {
+            logger.LogError("Missing or invalid required claims in SignalR invocation");
+            throw new UnauthorizedAccessException("Invalid connection claims");
+        }
+
+        // exception should not happen, just for static check compliance
+        var tenantId = tenantIdValues.ToString() ?? throw new NullReferenceException();
+        var connectorId = connectorIdValues.ToString() ?? throw new NullReferenceException();
+
+        // Remove subscription from table storage
+        var subscriptionsTable = tableServiceClient.GetTableClient(SubscriptionsTableName);
+        var partitionKey = SubscriptionKeyFormatter.CreatePartitionKey(tenantId, topicName);
+        var rowKey = SubscriptionKeyFormatter.CreateRowKey(connectorId);
+
+        try
+        {
+            await subscriptionsTable.DeleteEntityAsync(partitionKey, rowKey);
+        }
+        catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+        {
+            // Subscription already removed, ignore
+            logger.LogDebug(
+                "Subscription not found for {TenantId}/{ConnectorId} on topic {Topic}",
+                tenantId, connectorId, topicName);
+        }
+
+        logger.LogDebug(
+            "Connector {TenantId}/{ConnectorId} unsubscribed from topic {Topic}",
+            tenantId, connectorId, topicName);
+    }
+
 }

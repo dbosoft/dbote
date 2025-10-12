@@ -1,6 +1,4 @@
-﻿using System;
-using System.Linq;
-using System.Security.Authentication;
+﻿using System.Security.Authentication;
 // ReSharper disable UnusedMember.Global
 
 namespace SuperBus.Workers.BusWorker;

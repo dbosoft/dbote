@@ -1,35 +1,35 @@
-﻿using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
-using LanguageExt;
-using LanguageExt.UnsafeValueAccess;
-using Microsoft.Extensions.Logging;
-using SuperBus.Transport.Abstractions;
-using SuperBus.Management.Persistence.Entities;
-using SuperBus.Management.Persistence.Repositories;
 
-namespace SuperBus.SuperBusWorker;
+namespace SuperBus.BasicIdentityProvider;
 
-public class OpenId(
+public class TokenIssuer(
     ITokenCredentialsProvider tokenCredentialsProvider,
-    IOptions<OpenIdOptions> openIdOptions,
+    IOptions<TokenIssuerOptions> options,
     IConnectorRepository connectorRepository,
-    ILogger<OpenId> logger)
+    ILogger<TokenIssuer> logger)
 {
-    // TODO use HttRequest (aspnet core integration) or HttpRequestData (azure functions integration) as parameter type
     [Function("token")]
     [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> GetToken(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post")]
-        HttpRequest req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "{tenantId}/token")]
+        HttpRequest req,
+        string tenantId)
     {
+        if (string.IsNullOrEmpty(tenantId))
+        {
+            logger.LogWarning("Tenant ID not provided in route");
+            return new BadRequestResult();
+        }
+
         var form = await req.ReadFormAsync();
         if (!form.TryGetValue(OpenIdConnectParameterNames.GrantType, out var grantType)
             || grantType != OpenIdConnectGrantTypes.ClientCredentials
@@ -43,46 +43,43 @@ public class OpenId(
         var handler = new JsonWebTokenHandler();
         var assertionToken = handler.ReadJsonWebToken(clientAssertion);
 
-        if (!assertionToken.TryGetValue(ClaimNames.TenantId, out string tenantId)
-            || !assertionToken.TryGetValue(ClaimNames.ConnectorId, out string connectorId)
-            || assertionToken.Subject != $"{tenantId}-{connectorId}")
+        // Extract connector ID from standard sub claim - tenant comes from URL route
+        if (!assertionToken.TryGetValue("sub", out string connectorId) || string.IsNullOrEmpty(connectorId)
+            || assertionToken.Subject != connectorId)
         {
+            logger.LogWarning("Invalid client assertion: missing or invalid sub claim");
             return new BadRequestResult();
         }
-        
-        var result = await connectorRepository.GetById(tenantId, connectorId);
-        var optionalConnectorEntity = result.Match(
-            Right: r => r,
-            Left: e => e.ToException().Rethrow<Option<ConnectorEntity>>());
-        if (optionalConnectorEntity.IsNone)
+
+        var connector = await connectorRepository.GetById(tenantId, connectorId);
+        if (connector == null)
         {
             logger.LogWarning("Connector with tenant ID '{TenantId}' and connector ID '{ConnectorId}' not found.", tenantId, connectorId);
             return new BadRequestResult();
         }
-        
-        var connectorEntity = optionalConnectorEntity.ValueUnsafe();
 
         var connectorEcdsa = ECDsa.Create();
-        connectorEcdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(connectorEntity.PublicKey), out _);
+        connectorEcdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(connector.PublicKey), out _);
         var connectorKey = new ECDsaSecurityKey(connectorEcdsa)
         {
-            KeyId = assertionToken.Subject,
+            KeyId = connectorId,
         };
 
-        logger.LogInformation("Expected audience: {Audience}", openIdOptions.Value.Authority);
+        logger.LogInformation("Expected audience: {Audience}", options.Value.Authority);
 
+        // Validate client assertion: issuer must be connector ID, audience must be authority
         var assertionTokenResult = await handler.ValidateTokenAsync(assertionToken, new TokenValidationParameters()
         {
-            // TODO Fix issuer and audience
-            ValidIssuer = assertionToken.Subject,
-            ValidAudience = openIdOptions.Value.Authority,
+            ValidIssuer = connectorId,
+            ValidAudience = options.Value.Authority,
             IssuerSigningKey = connectorKey,
         });
 
         if (!assertionTokenResult.IsValid)
         {
             logger.LogInformation(assertionTokenResult.Exception,
-                "Validation of client assertion token for connector with tenant ID '{TenantId}' and connector ID '{ConnectorId}' failed:");
+                "Validation of client assertion token for connector with tenant ID '{TenantId}' and connector ID '{ConnectorId}' failed:",
+                tenantId, connectorId);
             return new BadRequestResult();
         }
 
@@ -98,43 +95,31 @@ public class OpenId(
 
     private string CreateAccessToken(string tenantId, string connectorId)
     {
-        var tokenCredentials = tokenCredentialsProvider.GetCredentials();
+        var tokenCredentials = tokenCredentialsProvider.GetSigningCredentials();
         var handler = new JsonWebTokenHandler();
 
         var subject = new ClaimsIdentity(
         [
-            new Claim(JwtRegisteredClaimNames.Sub, $"{tenantId}-{connectorId}"),
-            new Claim(ClaimNames.TenantId, tenantId),
-            new Claim(ClaimNames.ConnectorId, connectorId),
+            new Claim(JwtRegisteredClaimNames.Sub, connectorId),
+            new Claim("tid", tenantId),  // Azure AD standard tenant ID claim
             new Claim("scope", "superbus"),
         ]);
 
-        // TODO define authority and audience
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = subject,
             Expires = DateTime.UtcNow.AddMinutes(15),
             SigningCredentials = tokenCredentials,
-            Audience = openIdOptions.Value.Authority,
-            Issuer = openIdOptions.Value.Authority,
+            Audience = options.Value.Audience,
+            Issuer = options.Value.Authority,
         };
 
         return handler.CreateToken(tokenDescriptor);
     }
+}
 
-    private IActionResult CreateErrorResponse(string error, string? errorDescription = null)
-    {
-        var response = new Dictionary<string, string>
-        {
-            [OpenIdConnectParameterNames.Error] = error
-        };
-
-        if (errorDescription is not null)
-            response[OpenIdConnectParameterNames.ErrorDescription] = errorDescription;
-
-        return new JsonResult(response)
-        {
-            StatusCode = (int)HttpStatusCode.BadRequest,
-        };
-    }
+public class TokenIssuerOptions
+{
+    public string Authority { get; set; } = string.Empty;
+    public string Audience { get; set; } = string.Empty;
 }

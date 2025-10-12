@@ -13,4 +13,6 @@ public static class SuperBusHeaders
     public static readonly string ConnectorId = "superbus-connector-id";
 
     public static readonly string Signature = "superbus-signature";
+
+    public static readonly string Topic = "superbus-topic";
 }

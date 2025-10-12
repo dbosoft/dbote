@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -21,6 +14,10 @@ internal interface ISignalRClient
     Task<string> GetQueueConnection();
 
     Task SendMessage(string queue, SuperBusMessage message);
+
+    Task SubscribeToTopic(string topicName);
+
+    Task UnsubscribeFromTopic(string topicName);
 }
 
 // TODO handle reconnects
@@ -28,11 +25,13 @@ internal interface ISignalRClient
 internal class SignalRClient(
     Uri endpointUri,
     SuperBusCredentials credentials,
-    IPendingMessagesIndicators pendingMessagesIndicator)
+    IPendingMessagesIndicators pendingMessagesIndicator,
+    IHttpClientFactory httpClientFactory)
     : ISignalRClient, IInitializable, IDisposable
 {
     private HubConnection? _connection;
     private IDisposable? _listener;
+    private readonly HttpClient _httpClient = httpClientFactory.CreateClient("SuperBus.TokenClient");
 
     public void Initialize()
     {
@@ -64,22 +63,27 @@ internal class SignalRClient(
         await _connection!.SendAsync("SendMessage", queue, message);
     }
 
+    public async Task SubscribeToTopic(string topicName)
+    {
+        await _connection!.InvokeAsync("SubscribeToTopic", topicName);
+    }
+
+    public async Task UnsubscribeFromTopic(string topicName)
+    {
+        await _connection!.InvokeAsync("UnsubscribeFromTopic", topicName);
+    }
+
     // TODO review
     private async Task<string?> GetAccessToken()
     {
         // TODO test reauthentication
         // TODO add logging
-        var clientId = $"{credentials.TenantId}-{credentials.ConnectorId}";
-
         var signingCredentials = new SigningCredentials(credentials.SigningKey, SecurityAlgorithms.EcdsaSha256);
 
         var subject = new ClaimsIdentity(
         [
-            new Claim(JwtRegisteredClaimNames.Sub, clientId),
-            new Claim(ClaimNames.TenantId, credentials.TenantId),
-            new Claim(ClaimNames.ConnectorId, credentials.ConnectorId),
+            new Claim(JwtRegisteredClaimNames.Sub, credentials.ConnectorId),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-            // TODO add nbf and exp
         ]);
 
         var handler = new JsonWebTokenHandler();
@@ -87,27 +91,27 @@ internal class SignalRClient(
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = subject,
+            NotBefore = DateTime.UtcNow,
             Expires = DateTime.UtcNow.AddMinutes(5),
             SigningCredentials = signingCredentials,
-            Audience = endpointUri.ToString(),
-            Issuer = clientId,
+            Audience = credentials.Authority,
+            Issuer = credentials.ConnectorId,
             IncludeKeyIdInHeader = true,
         };
 
         var jwt = handler.CreateToken(tokenDescriptor);
-        
+
         var formContent = new FormUrlEncodedContent(
             new Dictionary<string, string>
             {
                 [OpenIdConnectParameterNames.GrantType] = OpenIdConnectGrantTypes.ClientCredentials,
-                [OpenIdConnectParameterNames.ClientId] = $"{credentials.TenantId}-{credentials.ConnectorId}",
+                [OpenIdConnectParameterNames.ClientId] = credentials.ConnectorId,
                 [OpenIdConnectParameterNames.ClientAssertionType] = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
                 [OpenIdConnectParameterNames.ClientAssertion] = jwt,
-                ["scope"] = "superbus"
+                ["scope"] = credentials.Scope
             });
-        
-        using var httpClient = new HttpClient();
-        var response = await httpClient.PostAsync(endpointUri + "/token", formContent);
+
+        var response = await _httpClient.PostAsync(credentials.TokenEndpoint, formContent);
         response.EnsureSuccessStatusCode();
 
         var responseJson = await response.Content.ReadAsStringAsync();

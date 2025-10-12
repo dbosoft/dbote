@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace SuperBus.Options;
+﻿namespace SuperBus.Options;
 
 public class ServiceBusQueuesOptions
 {
@@ -13,4 +7,6 @@ public class ServiceBusQueuesOptions
     public string Error { get; set; }
 
     public string Connectors { get; set; }
+
+    public string Events { get; set; }
 }

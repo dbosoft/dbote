@@ -1,13 +1,6 @@
 ﻿using Rebus.Messages;
 using Rebus.Pipeline;
 using Rebus.Pipeline.Send;
-using Rebus.Transport;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Identity.Client;
 
 namespace SuperBus.Rebus.Integration.Pipeline;
 
@@ -17,6 +10,14 @@ internal class SuperBusOutgoingConnectorStep(string connectorsQueue) : IOutgoing
     public async Task Process(OutgoingStepContext context, Func<Task> next)
     {
         var outgoingMessage = context.Load<TransportMessage>();
+
+        // Skip connector validation for topic broadcasts
+        if (outgoingMessage.Headers.ContainsKey(SuperBusHeaders.Topic))
+        {
+            await next();
+            return;
+        }
+
         var destinationAddresses = context.Load<DestinationAddresses>().ToList();
 
         var connectorId = GetConnectorId(destinationAddresses);

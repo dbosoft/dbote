@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Rebus.Config;
 using Rebus.Retry.Simple;
+using Rebus.Routing.TypeBased;
 using Rebus.Serialization.Json;
 using SuperBus.AppConfiguration;
 using SuperBus.Options;
@@ -26,6 +27,7 @@ builder.Services.AddRebus((configure, serviceProvider) =>
         .Options(b => b.RetryStrategy(errorQueueName: options.Queues.Error))
         .Options(o => o.EnableSuperBus(options.Queues.Connectors))
         .Transport(t => t.UseAzureServiceBus(builder.Configuration.GetSection("SuperBus:Cloud:ServiceBus:Connection"), options.Queues.Cloud))
+        .Routing(r => r.TypeBased().MapAssemblyOf<SuperBus.Samples.Chat.Messages.ChatResponse>(options.Queues.Connectors))
         .Serialization(s => s.UseSystemTextJson())
         .Logging(l => l.MicrosoftExtensionsLogging(serviceProvider.GetRequiredService<ILoggerFactory>()));
 });

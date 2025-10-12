@@ -4,13 +4,16 @@ using Rebus.Pipeline;
 using Rebus.Threading;
 using Rebus.Time;
 using Rebus.Timeouts;
+using Rebus.Subscriptions;
 using Rebus.Transport;
+using SuperBus.Rebus.Subscriptions;
 using SuperBus.Rebus.Transport;
 using SuperBus.Transport;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Rebus.Pipeline.Receive;
@@ -31,9 +34,10 @@ public static class SuperBusConfigurationExtensions
         Uri endpointUri,
         string queueName,
         SuperBusCredentials credentials,
+        IHttpClientFactory httpClientFactory,
         SuperBusTransportOptions? options = null)
     {
-        Register(configurer, queueName, endpointUri, credentials, options);
+        Register(configurer, queueName, endpointUri, credentials, httpClientFactory, options);
     }
 
     private static void Register(
@@ -41,6 +45,7 @@ public static class SuperBusConfigurationExtensions
         string queueName,
         Uri endpointUri,
         SuperBusCredentials credentials,
+        IHttpClientFactory httpClientFactory,
         SuperBusTransportOptions? options)
     {
         options ??= new SuperBusTransportOptions();
@@ -70,7 +75,7 @@ public static class SuperBusConfigurationExtensions
             .Register(c =>
             {
                 var pendingMessagesIndicator = c.Get<IPendingMessagesIndicators>();
-                return new SignalRClient(endpointUri, credentials, pendingMessagesIndicator);
+                return new SignalRClient(endpointUri, credentials, pendingMessagesIndicator, httpClientFactory);
             });
 
         configurer.OtherService<SuperBusTransport>().Register(c =>
@@ -86,6 +91,12 @@ public static class SuperBusConfigurationExtensions
                 pendingMessagesIndicator,
                 rebusLoggerFactory,
                 asyncTaskFactory);
+        });
+
+        configurer.OtherService<ISubscriptionStorage>().Register(c =>
+        {
+            var signalRClient = c.Get<ISignalRClient>();
+            return new SuperBusSubscriptionStorage(signalRClient);
         });
 
         configurer.Register(c => c.Get<SuperBusTransport>());

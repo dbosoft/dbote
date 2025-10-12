@@ -14,4 +14,10 @@ public class SuperBusCredentials
     public string ConnectorId { get; set; }
 
     public SecurityKey SigningKey { get; set; }
+
+    public string Authority { get; set; }
+
+    public string TokenEndpoint { get; set; }
+
+    public string Scope { get; set; }
 }

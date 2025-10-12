@@ -1,5 +1,46 @@
 # SuperBus
 
+## Local Development
+
+### Prerequisites
+- Docker Desktop
+- .NET 8 SDK
+
+### Starting the Development Environment
+
+The project uses Docker Compose to run all required emulators and services:
+
+```bash
+docker-compose up -d
+```
+
+This starts the following services:
+
+- **Azure Service Bus Emulator** - Ports 5672 (AMQP), 5300 (HTTP)
+- **SQL Server** - Port 1433
+- **Azurite (Storage Emulator)** - Ports 10000 (Blob), 10001 (Queue), 10002 (Table)
+  - Connection string: `UseDevelopmentStorage=true`
+- **Azure SignalR Emulator** - Port 8888
+- **Basic Identity Provider** - Port 7071
+  - Token endpoint: `POST http://localhost:7071/token`
+  - JWKS endpoint: `GET http://localhost:7071/.well-known/jwks.json`
+
+### Basic Identity Provider
+
+The BasicIdentityProvider is a simple sample implementation that demonstrates the token issuance pattern for connector authentication. It:
+
+- Issues access tokens for connectors using OAuth 2.0 Client Credentials flow
+- Validates connector client assertions (JWT signed with connector's private key)
+- Exposes a JWKS endpoint for public key discovery
+- Uses an ephemeral ECDSA P-256 key (generated on startup)
+
+**Note:** This is a minimal reference implementation. Production deployments should use a separate identity/auth service with:
+- Persistent keys stored in Azure Key Vault
+- Caching with Redis
+- Proper key rotation
+- Integration with organization/tenant management
+
+The SuperBus Worker validates tokens from the BasicIdentityProvider by fetching public keys from its JWKS endpoint.
 
 ## Design
 

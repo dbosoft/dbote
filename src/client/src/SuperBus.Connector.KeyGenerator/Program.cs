@@ -1,8 +1,4 @@
-﻿using System.Reflection;
-using Microsoft.IdentityModel.Tokens;
-using System.Security.Cryptography;
-using System.Text;
-using SuperBus.Connector.KeyGenerator;
+﻿using SuperBus.Connector.KeyGenerator;
 
 var keyInfo = new KeyGenerator().GenerateKey();
 

@@ -1,9 +1,7 @@
-services:      
-  azurite-init:
+services:
+  connector-init:
     environment:
-      # Use the full Azurite connection string as we need to change the host
-      "StorageConnection": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
-      "StoragePrefix": "superbus-sample-simple"
+      "IdentityProviderUrl": "http://basicidentityprovider"
 
 configs:
   connectors:
@@ -64,6 +62,20 @@ configs:
                 },
                 {
                   "Name": "superbus-sample-simple-connectors",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "superbus-sample-simple-events",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",

@@ -9,7 +9,11 @@
     "SuperBus__Worker__ServiceBus__Queues__Cloud": "superbus-dev-cloud",
     "SuperBus__Worker__ServiceBus__Queues__Error": "superbus-dev-error",
     "SuperBus__Worker__ServiceBus__Queues__Connectors": "superbus-dev-connectors",
+    "SuperBus__Worker__ServiceBus__Queues__Events": "superbus-dev-events",
     "SuperBus__Worker__SignalR__Connection": "Endpoint=http://localhost;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;",
-    "SuperBus__Worker__OpenId__Authority": "http://localhost:7249/api"
+    "SuperBus__Worker__OpenId__Authority": "http://localhost:7250",
+    "SuperBus__Worker__OpenId__JwksUri": "http://localhost:7250/api/.well-known/jwks.json",
+    "SuperBus__Worker__OpenId__Audience": "http://localhost:7249/api",
+    "SuperBus__Worker__OpenId__RequiredScope": "superbus"
   }
 }

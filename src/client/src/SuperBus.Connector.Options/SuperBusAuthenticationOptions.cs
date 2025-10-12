@@ -13,4 +13,10 @@ public class SuperBusAuthenticationOptions
     public string KeyId { get; set; }
 
     public string? SigningKey { get; set; }
+
+    public string? Authority { get; set; }
+
+    public string? TokenEndpoint { get; set; }
+
+    public string? Scope { get; set; }
 }

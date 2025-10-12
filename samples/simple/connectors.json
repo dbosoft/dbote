@@ -1,0 +1,17 @@
+[
+  {
+    "TenantId": "tenant-a",
+    "ConnectorId": "connector-a",
+    "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDSfgIieGaVTF7RLRoo0HH/xUjg3T8jHr1RkxeRBqwy7lAGBG6Y4Pnlka0qqVARrx3TVuMHhmRSQnu1KfFgKnuA=="
+  },
+  {
+    "TenantId": "tenant-a",
+    "ConnectorId": "connector-b",
+    "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEL3yIgvcG9Cyrzv1KU0pr/Rxrf4N64MEDjYLXeIYupnFXfbhAnLRyb6SGNLlnSm9YE8HIR1JQdi5fY57mS++PkA=="
+  },
+  {
+    "TenantId": "tenant-b",
+    "ConnectorId": "connector-a",
+    "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcu3L06Rb7OoM5va6o+qNPtH6qCNuGoUAWTpkYUAjZCzzW8zOQSXoHY5Uk6OG9+W5f1JVOtU/SKEggSv5QQTx9A=="
+  }
+]

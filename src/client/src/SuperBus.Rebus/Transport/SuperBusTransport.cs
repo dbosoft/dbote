@@ -1,8 +1,6 @@
 ﻿using Azure;
 using Azure.Storage.Queues;
 using Azure.Storage.Queues.Models;
-using Microsoft.AspNetCore.SignalR.Client;
-using Rebus.Bus;
 using Rebus.Exceptions;
 using Rebus.Extensions;
 using Rebus.Logging;
@@ -10,16 +8,11 @@ using Rebus.Messages;
 using Rebus.Threading;
 using Rebus.Transport;
 using SuperBus.Rebus.Config;
-using SuperBus.Transport;
 using SuperBus.Transport.Abstractions;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace SuperBus.Rebus.Transport;
 

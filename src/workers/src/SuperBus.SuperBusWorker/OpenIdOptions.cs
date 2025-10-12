@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace SuperBus.SuperBusWorker;
+﻿namespace SuperBus.SuperBusWorker;
 
 public class OpenIdOptions
 {
-    public string Authority { get; set; }
+    public string Authority { get; set; } = string.Empty;
+    public string JwksUri { get; set; } = string.Empty;
+    public string Audience { get; set; } = string.Empty;
+    public string RequiredScope { get; set; } = string.Empty;
 }

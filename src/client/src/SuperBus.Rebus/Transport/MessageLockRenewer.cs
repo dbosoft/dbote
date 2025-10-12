@@ -1,8 +1,7 @@
 ﻿// Based on https://github.com/rebus-org/Rebus.AzureQueues
 // Copyright (c) 2019 Mogens Heller Grabe
 // Licensed under MIT license https://github.com/rebus-org/Rebus.AzureQueues/blob/master/LICENSE.md
-using System;
-using System.Threading.Tasks;
+
 using Azure.Storage.Queues;
 using Azure.Storage.Queues.Models;
 

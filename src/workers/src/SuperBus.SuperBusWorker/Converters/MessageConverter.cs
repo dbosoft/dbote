@@ -1,11 +1,7 @@
 ﻿// Based on https://github.com/rebus-org/Rebus.AzureServiceBus/blob/master/Rebus.AzureServiceBus/AzureServiceBus/Messages/DefaultMessageConverter.cs
 // Copyright (c) 2012-2016 Mogens Heller Grabe
 // Licensed under MIT license https://github.com/rebus-org/Rebus.AzureServiceBus/blob/master/LICENSE.md
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 using Azure.Messaging.ServiceBus;
 using Rebus.Extensions;
 using Rebus.Messages;
