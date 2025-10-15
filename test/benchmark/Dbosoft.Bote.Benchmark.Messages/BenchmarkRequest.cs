@@ -10,6 +10,6 @@ public class BenchmarkRequest
 public enum BenchmarkType
 {
     Simple,
-    Connector,
+    Client,
     Service,
 }

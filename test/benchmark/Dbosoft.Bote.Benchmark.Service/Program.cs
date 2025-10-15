@@ -27,7 +27,7 @@ builder.Services.AddRebus((configure, serviceProvider) =>
     var serviceQueueName = builder.Configuration["dbote:Service:ServiceBus:Queues:Service"];
     return configure
         .Options(b => b.RetryStrategy(errorQueueName: options.Queues.Error))
-        .Options(o => o.EnableBote(options.Queues.Connectors))
+        .Options(o => o.EnableBote(options.Queues.Clients))
         .Transport(t => t.UseAzureServiceBus(
             builder.Configuration.GetSection("dbote:Service:ServiceBus:Connection"),
             serviceQueueName!))

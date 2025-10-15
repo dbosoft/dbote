@@ -9,7 +9,7 @@ public class SimpleWorkload(IBus bus) : WorkloadBase(BenchmarkType.Simple, bus);
 
 public class ServiceWorkload(IBus bus) : WorkloadBase(BenchmarkType.Service, bus);
 
-public class ConnectorWorkload(IBus bus) : WorkloadBase(BenchmarkType.Connector, bus);
+public class ClientWorkload(IBus bus) : WorkloadBase(BenchmarkType.Client, bus);
 
 public abstract class WorkloadBase(BenchmarkType benchmarkType, IBus bus) : Workload
 {

@@ -4,11 +4,11 @@ WORKDIR /source
 
 # Copy source code and publish app
 COPY . .
-RUN dotnet publish -a $TARGETARCH -o /app ./ConnectorSetupTool/ConnectorSetupTool.csproj
+RUN dotnet publish -a $TARGETARCH -o /app ./ClientSetupTool/ClientSetupTool.csproj
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/runtime:8.0-noble
 WORKDIR /app
 COPY --link --from=build /app .
 USER $APP_UID
-ENTRYPOINT ["./ConnectorSetupTool"]
+ENTRYPOINT ["./ClientSetupTool"]

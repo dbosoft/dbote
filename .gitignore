@@ -261,3 +261,5 @@ __pycache__/
 *.pyc
 
 gitversion.json
+/.claude/settings.local.json
+/docs/databus-concept.md

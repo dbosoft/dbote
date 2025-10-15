@@ -56,7 +56,7 @@ class DboteStack extends TerraformStack {
       sku: 'developer',
     });
 
-    // Deploy BasicIdentityProvider (with in-memory connector storage)
+    // Deploy BasicIdentityProvider (with in-memory client storage)
     const identityProvider = new DboteIdentityProvider(this, environment, insights.connection);
 
     const worker = new DboteWorker(this, environment, appConfiguration.endpoint, insights.connection);
@@ -87,9 +87,9 @@ class DboteStack extends TerraformStack {
       name: environment.formatName('sbq', 'cloud'),
     });
 
-    const connectorsQueue = new ServicebusQueue(this, environment.formatName('sbq', 'connectors'), {
+    const clientsQueue = new ServicebusQueue(this, environment.formatName('sbq', 'clients'), {
       namespaceId: serviceBusNamespace.id,
-      name: environment.formatName('sbq', 'connectors'),
+      name: environment.formatName('sbq', 'clients'),
     });
 
     const errorQueue = new ServicebusQueue(this, environment.formatName('sbq', 'error'), {
@@ -201,7 +201,7 @@ class DboteStack extends TerraformStack {
     worker.addAppSetting('dbote__Worker__ServiceBus__Connection__fullyQualifiedNamespace', fullyQualifiedNamespace);
     worker.addAppSetting('dbote__Worker__ServiceBus__Connection__credential', 'managedidentity');
     worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Cloud', cloudQueue.name);
-    worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Connectors', connectorsQueue.name);
+    worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Clients', clientsQueue.name);
     worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Error', errorQueue.name);
     worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Events', eventsQueue.name);
     worker.addAppSetting('dbote__Worker__SignalR__Connection__serviceUri', `https://${signalrServiceName}.service.signalr.net`);
@@ -240,10 +240,10 @@ class DboteStack extends TerraformStack {
       label: environment.environment,
     });
 
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-queue-connectors'), {
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-queue-clients'), {
       configurationStoreId: appConfiguration.id,
-      key: 'dbote:Worker:ServiceBus:Queues:Connectors',
-      value: connectorsQueue.name,
+      key: 'dbote:Worker:ServiceBus:Queues:Clients',
+      value: clientsQueue.name,
       label: environment.environment,
     });
 
@@ -312,10 +312,10 @@ class DboteStack extends TerraformStack {
       label: environment.environment,
     });
 
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-connectors'), {
+    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-clients'), {
       configurationStoreId: appConfiguration.id,
-      key: 'dbote:Cloud:ServiceBus:Queues:Connectors',
-      value: connectorsQueue.name,
+      key: 'dbote:Cloud:ServiceBus:Queues:Clients',
+      value: clientsQueue.name,
       label: environment.environment,
     });
 

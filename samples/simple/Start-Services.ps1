@@ -10,7 +10,7 @@ Push-Location ./Dbosoft.Bote.Samples.Simple.Cloud
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
-Push-Location ./Dbosoft.Bote.Samples.Simple.Connector
+Push-Location ./Dbosoft.Bote.Samples.Simple.Client
 dotnet publish -c Release -r linux-x64
 Pop-Location
 

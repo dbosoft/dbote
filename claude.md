@@ -2,7 +2,7 @@
 
 ## What is dbosoft bote?
 
-**dbosoft bote** is a multi-tenant hybrid messaging gateway that bridges cloud services (Azure Service Bus) with on-premises/edge connectors (Azure Storage Queues). It enables building SaaS applications with secure, economical, and accessible hybrid cloud connectivity.
+**dbosoft bote** is a multi-tenant hybrid messaging gateway that bridges cloud services (Azure Service Bus) with on-premises/edge clients (Azure Storage Queues). It enables building SaaS applications with secure, economical, and accessible hybrid cloud connectivity.
 
 ### The Problem It Solves
 
@@ -10,12 +10,12 @@ Modern SaaS applications need to communicate with on-premises systems, but face 
 
 1. **Polling Cost & Inefficiency**: Standard Rebus Azure Storage transport continuously polls Storage Queues (even when empty), generating expensive Azure transaction costs at scale
 2. **Network Accessibility**: Azure Service Bus uses AMQP protocol (ports 5671/5672) which is blocked by corporate firewalls; requires VPN/ExpressRoute for on-premises access
-3. **Infrastructure Exposure**: Directly exposing internal Service Bus queues to connectors reveals architecture and creates security risks
+3. **Infrastructure Exposure**: Directly exposing internal Service Bus queues to clients reveals architecture and creates security risks
 4. **Multi-Tenant Economics**: Traditional per-tenant infrastructure (separate Service Bus namespaces, Functions, etc.) doesn't scale economically
 
 ### The Solution: DMZ/Gateway Pattern
 
-bote creates a **security and abstraction boundary** between internal cloud architecture and customer connectors:
+bote creates a **security and abstraction boundary** between internal cloud architecture and customer clients:
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -23,7 +23,7 @@ bote creates a **security and abstraction boundary** between internal cloud arch
 │ ───────────────────────────────────────────         │
 │ • Service Bus (push-based, high-throughput)         │
 │   - Internal queues: orders, shipping, etc.         │
-│   - Gateway queues: bote-cloud, bote-connectors     │
+│   - Gateway queues: bote-cloud, bote-clients     │
 │ • Databases, Redis, Internal Services (hidden)      │
 │                                                      │
 │ ┌─────────────────────────────────────────┐         │
@@ -50,7 +50,7 @@ bote creates a **security and abstraction boundary** between internal cloud arch
                        │
            ┌───────────▼──────────────┐
            │  CUSTOMER PREMISES       │
-           │  • Connector (Rebus)     │
+           │  • Client (Rebus)     │
            │  • No Azure connectivity │
            │  • No VPN required       │
            └──────────────────────────┘
@@ -65,8 +65,8 @@ bote creates a **security and abstraction boundary** between internal cloud arch
 - **Azure Service Bus**: High-throughput, push-based messaging for cloud-to-cloud communication
 - **Rebus with ASB Transport**: Native Service Bus integration with all features (pub/sub, sessions, transactions)
 - **Queues**:
-  - `bote-cloud`: Cloud receives messages FROM connectors
-  - `bote-connectors`: Cloud sends messages TO connectors (single queue for all tenants)
+  - `bote-cloud`: Cloud receives messages FROM clients
+  - `bote-clients`: Cloud sends messages TO clients (single queue for all tenants)
   - Internal queues: Your application's internal architecture
 
 **Benefits**:
@@ -77,15 +77,15 @@ bote creates a **security and abstraction boundary** between internal cloud arch
 
 ### Edge Side: Storage Queues + Custom Transport
 
-**Used by**: On-premises/edge connectors
+**Used by**: On-premises/edge clients
 
 - **Azure Storage Queues**: HTTPS-accessible queues with SAS token authentication
 - **Custom Rebus Transport**: Eliminates wasteful polling via SignalR push notifications
-- **Queues**: `bote-{tenantId}-{connectorId}` (one per tenant-connector, dynamically created)
+- **Queues**: `bote-{tenantId}-{clientId}` (one per tenant-client, dynamically created)
 
 **How it Works**:
 1. **SignalR Push**: Worker sends instant notification when message arrives
-2. **Smart Polling**: Connector only polls Storage Queue when notified
+2. **Smart Polling**: Client only polls Storage Queue when notified
 3. **Near-Zero Idle Cost**: No polling when queue is empty
 
 **Benefits**:
@@ -99,13 +99,13 @@ bote creates a **security and abstraction boundary** between internal cloud arch
 **Purpose**: Enforce security, route messages, maintain tenant isolation
 
 **Responsibilities**:
-1. **Authentication**: Validates connector JWT tokens (OAuth 2.0 Client Credentials flow with ECDSA-signed client assertions)
-2. **Identity Injection**: Adds trusted `TenantId` + `ConnectorId` headers (connectors cannot spoof these - see `Messages.cs:254-267`)
+1. **Authentication**: Validates client JWT tokens (OAuth 2.0 Client Credentials flow with ECDSA-signed client assertions)
+2. **Identity Injection**: Adds trusted `TenantId` + `ClientId` headers (clients cannot spoof these - see `Messages.cs:254-267`)
 3. **Message Routing**:
-   - **Targeted**: Routes to specific connector queue (`bote-{tenant}-{connector}`)
-   - **Broadcast**: Routes to all connectors subscribed to a topic within a tenant
+   - **Targeted**: Routes to specific client queue (`bote-{tenant}-{client}`)
+   - **Broadcast**: Routes to all clients subscribed to a topic within a tenant
 4. **Isolation**: Ensures tenants cannot access each other's messages
-5. **SignalR Notifications**: Sends push notifications to active connectors
+5. **SignalR Notifications**: Sends push notifications to active clients
 
 **Deployment**: Single shared Azure Function serves ALL tenants (economic multi-tenancy)
 
@@ -119,7 +119,7 @@ bote creates a **security and abstraction boundary** between internal cloud arch
 - **BoteWorker** (Azure Function, auto-scales for all tenants)
 - **Storage Account** (one account with many queues)
 - **SignalR Service** (all tenant connections)
-- **Identity Provider** (OAuth server for connector authentication)
+- **Identity Provider** (OAuth server for client authentication)
 - **Cloud Services** (your SaaS application logic)
 
 **Cost**: Fixed cost regardless of tenant count (Service Bus, Functions compute, Storage account)
@@ -128,9 +128,9 @@ bote creates a **security and abstraction boundary** between internal cloud arch
 
 **Created on tenant onboarding:**
 
-- **Storage Queues**: `bote-{tenantId}-{connectorId}` (created on-demand, pennies per month)
+- **Storage Queues**: `bote-{tenantId}-{clientId}` (created on-demand, pennies per month)
 - **Table Storage**: Subscription entries for topic broadcasts
-- **Identity Provider**: Connector registrations (public keys)
+- **Identity Provider**: Client registrations (public keys)
 
 **Cost**: Near-zero per tenant (only pay for storage transactions/storage)
 
@@ -138,10 +138,10 @@ bote creates a **security and abstraction boundary** between internal cloud arch
 
 **Deployed in customer infrastructure:**
 
-- **Connector Application** (runs on-premises/edge)
-- **Private Signing Key** (ECDSA P-256, unique per connector)
+- **Client Application** (runs on-premises/edge)
+- **Private Signing Key** (ECDSA P-256, unique per client)
 
-**No Azure connectivity required**: Connectors access only Storage Queues via HTTPS
+**No Azure connectivity required**: Clients access only Storage Queues via HTTPS
 
 ## Multi-Tenancy Economics
 
@@ -169,45 +169,45 @@ builder.Services.AddRebus((configure, serviceProvider) =>
     var options = serviceProvider.GetRequiredService<IOptions<ServiceBusOptions>>().Value;
     return configure
         .Options(b => b.RetryStrategy(errorQueueName: options.Queues.Error))
-        .Options(o => o.EnableBote(options.Queues.Connectors))  // Enable bote multi-tenancy
+        .Options(o => o.EnableBote(options.Queues.Clients))  // Enable bote multi-tenancy
         .Transport(t => t.UseAzureServiceBus(
             builder.Configuration.GetSection("dbote:Cloud:ServiceBus:Connection"),
             options.Queues.Cloud))
         .Serialization(s => s.UseSystemTextJson())
         .Logging(l => l.MicrosoftExtensionsLogging(...))
         .Routing(r => r.TypeBased()
-            .Map<MessageToConnector>($"{options.Queues.Connectors}-connector-id"));
+            .Map<MessageToClient>($"{options.Queues.Clients}-client-id"));
 });
 ```
 
 **Key Points**:
 - `.EnableBote()` adds tenant-aware pipeline steps and name formatter
 - Use Service Bus connection (standard Rebus ASB transport)
-- Route messages to `{connectorsQueue}-{connectorId}` (formatter redirects to shared queue)
+- Route messages to `{clientsQueue}-{clientId}` (formatter redirects to shared queue)
 
-### Sending Messages to Connectors
+### Sending Messages to Clients
 
-#### Targeted Message (to specific connector):
+#### Targeted Message (to specific client):
 
 ```csharp
-// Cloud receives tenant/connector identity from incoming message headers
+// Cloud receives tenant/client identity from incoming message headers
 var tenantId = MessageContext.Current.Headers[BoteHeaders.TenantId];
-var connectorId = MessageContext.Current.Headers[BoteHeaders.ConnectorId];
+var clientId = MessageContext.Current.Headers[BoteHeaders.ClientId];
 
 await bus.Send(new ResponseMessage(), new Dictionary<string, string>()
 {
     [BoteHeaders.TenantId] = tenantId,
-    [BoteHeaders.ConnectorId] = connectorId,
+    [BoteHeaders.ClientId] = clientId,
 });
 ```
 
 **Flow**:
-1. Cloud sends to `bote-connectors` queue
-2. BoteWorker routes to `bote-{tenantId}-{connectorId}` Storage Queue
-3. SignalR notifies specific connector
-4. Connector polls queue and receives message
+1. Cloud sends to `bote-clients` queue
+2. BoteWorker routes to `bote-{tenantId}-{clientId}` Storage Queue
+3. SignalR notifies specific client
+4. Client polls queue and receives message
 
-#### Broadcast Message (to all connectors in tenant on a topic):
+#### Broadcast Message (to all clients in tenant on a topic):
 
 ```csharp
 var tenantId = MessageContext.Current.Headers[BoteHeaders.TenantId];
@@ -220,18 +220,18 @@ await bus.Send(new BroadcastMessage(), new Dictionary<string, string>()
 ```
 
 **Flow**:
-1. Cloud sends to `bote-connectors` queue with Topic header
-2. BoteWorker queries subscriptions table for connectors subscribed to `{tenantId}/chat`
-3. Sends message to each subscribed connector's Storage Queue
+1. Cloud sends to `bote-clients` queue with Topic header
+2. BoteWorker queries subscriptions table for clients subscribed to `{tenantId}/chat`
+3. Sends message to each subscribed client's Storage Queue
 4. SignalR notifies all subscribers
-5. Active connectors receive message (offline connectors do not accumulate messages)
+5. Active clients receive message (offline clients do not accumulate messages)
 
-### Connector Configuration
+### Client Configuration
 
-Connectors use custom bote transport with Storage Queues:
+Clients use custom bote transport with Storage Queues:
 
 ```csharp
-builder.Services.Configure<BoteOptions>(builder.Configuration.GetSection("dbote:Connector"));
+builder.Services.Configure<BoteOptions>(builder.Configuration.GetSection("dbote:Client"));
 
 builder.Services.AddRebus((configure, serviceProvider) =>
 {
@@ -242,10 +242,10 @@ builder.Services.AddRebus((configure, serviceProvider) =>
         .Options(b => b.RetryStrategy(errorQueueName: options.Queues.Error))
         .Transport(t => t.UseBote(  // Custom bote transport
             new Uri(options.Endpoint),  // BoteWorker SignalR endpoint
-            $"{options.Queues.Connectors}-{options.ConnectorId}",  // Queue name
+            $"{options.Queues.Clients}-{options.ClientId}",  // Queue name
             new BoteCredentials
             {
-                ConnectorId = options.ConnectorId,
+                ClientId = options.ClientId,
                 SigningKey = options.GetSigningKey(),  // ECDSA private key
                 TenantId = options.TenantId,
                 Authority = options.Authentication.Authority,
@@ -266,7 +266,7 @@ builder.Services.AddRebus((configure, serviceProvider) =>
 
 ### Subscribing to Topics
 
-Connectors use standard Rebus topic subscription API:
+Clients use standard Rebus topic subscription API:
 
 ```csharp
 var bus = app.Services.GetRequiredService<Rebus.Bus.IBus>();
@@ -276,41 +276,41 @@ await bus.Advanced.Topics.Subscribe("chat");
 **What Happens**:
 1. Rebus calls `BoteSubscriptionStorage.Subscribe()`
 2. Storage calls SignalR's `SubscribeToTopic("chat")`
-3. BoteWorker stores subscription in Table Storage: `{tenantId}/chat` → `{connectorId}`
-4. Future broadcasts to this topic include this connector
+3. BoteWorker stores subscription in Table Storage: `{tenantId}/chat` → `{clientId}`
+4. Future broadcasts to this topic include this client
 
 ## Security Model
 
-### Connector Authentication Flow
+### Client Authentication Flow
 
-1. **Connector**: Creates JWT client assertion signed with private ECDSA key
-2. **Connector**: Sends OAuth 2.0 Client Credentials request to Identity Provider
+1. **Client**: Creates JWT client assertion signed with private ECDSA key
+2. **Client**: Sends OAuth 2.0 Client Credentials request to Identity Provider
 3. **Identity Provider**: Validates signature using public key (from JWKS endpoint)
-4. **Identity Provider**: Issues access token with `tenant_id` and `connector_id` claims
-5. **Connector**: Connects to SignalR with access token
+4. **Identity Provider**: Issues access token with `tenant_id` and `client_id` claims
+5. **Client**: Connects to SignalR with access token
 6. **BoteWorker**: Validates access token against Identity Provider JWKS
-7. **BoteWorker**: Extracts tenant/connector identity from token claims
+7. **BoteWorker**: Extracts tenant/client identity from token claims
 8. **BoteWorker**: Associates SignalR connection with verified identity
 
 ### Message Flow Security
 
-**Cloud → Connector:**
-1. Cloud service adds `TenantId` + `ConnectorId` headers (from authenticated incoming message)
+**Cloud → Client:**
+1. Cloud service adds `TenantId` + `ClientId` headers (from authenticated incoming message)
 2. Message routed through Service Bus to BoteWorker
 3. BoteWorker routes to correct Storage Queue based on headers
-4. Only authenticated connector can access their queue (SAS token scoped to specific queue)
+4. Only authenticated client can access their queue (SAS token scoped to specific queue)
 
-**Connector → Cloud:**
-1. Connector sends message via SignalR (authenticated connection)
-2. **BoteWorker validates and REJECTS any tenant/connector headers from connector** (see `Messages.cs:254-267`)
+**Client → Cloud:**
+1. Client sends message via SignalR (authenticated connection)
+2. **BoteWorker validates and REJECTS any tenant/client headers from client** (see `Messages.cs:254-267`)
 3. **BoteWorker injects trusted headers** from authenticated SignalR connection claims
-4. Cloud services trust headers because they came from BoteWorker, not connector
+4. Cloud services trust headers because they came from BoteWorker, not client
 
 **Key Security Properties**:
-- Connectors cannot spoof tenant/connector identity
-- Connectors cannot access other tenants' messages
-- Connectors cannot see internal Service Bus infrastructure
-- All connector→cloud messages have verified identity
+- Clients cannot spoof tenant/client identity
+- Clients cannot access other tenants' messages
+- Clients cannot see internal Service Bus infrastructure
+- All client→cloud messages have verified identity
 
 ## Identity Provider
 
@@ -319,10 +319,10 @@ await bus.Advanced.Topics.Subscribe("chat");
 The included `BasicIdentityProvider` is a **minimal reference implementation** for development and testing:
 
 **Features**:
-- Issues OAuth 2.0 access tokens for connectors
+- Issues OAuth 2.0 access tokens for clients
 - Validates ECDSA-signed client assertions
 - Exposes JWKS endpoint for public key discovery
-- In-memory connector registry
+- In-memory client registry
 
 **Limitations** (not suitable for production):
 - Ephemeral ECDSA key (regenerated on restart)
@@ -340,14 +340,14 @@ For production deployments, replace with a proper identity/auth service:
 - **Key rotation** with overlapping validity periods
 - **Caching** (Redis) for token validation
 - **JWKS endpoint** for public key discovery
-- **Tenant management** (organization hierarchy, connector registration)
+- **Tenant management** (organization hierarchy, client registration)
 - **Audit logging** (token issuance, authentication failures)
 - **Rate limiting** and DDoS protection
 
 **Integration**:
 - BoteWorker validates tokens via standard OIDC/OAuth 2.0 token validation
 - Configure `dbote:Worker:OpenId:Authority` and `dbote:Worker:OpenId:JwksUri` in BoteWorker settings
-- Connectors configure `TokenEndpoint` and `Authority` in connector settings
+- Clients configure `TokenEndpoint` and `Authority` in client settings
 
 ## Repository Maintenance
 
@@ -359,10 +359,10 @@ For production deployments, replace with a proper identity/auth service:
 
 **Key Files**:
 - `BoteConfigurationExtensions.cs`: `.EnableBote()` configuration
-- `BoteNameFormatter.cs`: Redirects `bote-connectors-{id}` → `bote-connectors`
-- `BoteHeaders.cs`: Defines header constants (`TenantId`, `ConnectorId`, `Topic`, `Signature`)
+- `BoteNameFormatter.cs`: Redirects `bote-clients-{id}` → `bote-clients`
+- `BoteHeaders.cs`: Defines header constants (`TenantId`, `ClientId`, `Topic`, `Signature`)
 - `Pipeline/BoteOutgoingStep.cs`: Ensures outgoing messages have tenant context
-- `Pipeline/BoteOutgoingConnectorStep.cs`: Adds `ConnectorId` header or validates `Topic` broadcast
+- `Pipeline/BoteOutgoingClientStep.cs`: Adds `ClientId` header or validates `Topic` broadcast
 - `Pipeline/BoteIncomingStep.cs`: Validates incoming messages have tenant context
 
 **When to Update**:
@@ -372,7 +372,7 @@ For production deployments, replace with a proper identity/auth service:
 
 #### 2. Custom Transport (`src/client/src/Dbosoft.Bote.Rebus`)
 
-**Purpose**: Connector-side transport with Storage Queues + SignalR
+**Purpose**: Client-side transport with Storage Queues + SignalR
 
 **Key Files**:
 - `Transport/BoteTransport.cs`: Custom Rebus transport implementation
@@ -394,11 +394,11 @@ For production deployments, replace with a proper identity/auth service:
 - `Messages.cs`: Azure Functions handlers
   - `Negotiate()`: SignalR connection negotiation with JWT validation
   - `ServiceBusReceivedMessageFunction()`: Routes Service Bus messages to Storage Queues
-  - `SendMessage()`: Receives messages from connectors via SignalR, validates, routes to Service Bus
-  - `GetQueueMetadata()`: Provides SAS URI for connector's Storage Queue
+  - `SendMessage()`: Receives messages from clients via SignalR, validates, routes to Service Bus
+  - `GetQueueMetadata()`: Provides SAS URI for client's Storage Queue
   - `SubscribeToTopic()` / `UnsubscribeFromTopic()`: Manages topic subscriptions
-- `TokenValidationService.cs`: Validates connector JWT tokens
-- `ConnectorIdentity.cs`: Extracts tenant/connector claims from tokens
+- `TokenValidationService.cs`: Validates client JWT tokens
+- `ClientIdentity.cs`: Extracts tenant/client claims from tokens
 
 **When to Update**:
 - Changing authentication/authorization logic
@@ -408,7 +408,7 @@ For production deployments, replace with a proper identity/auth service:
 
 #### 4. Identity Provider (`src/workers/src/Dbosoft.Bote.BasicIdentityProvider`)
 
-**Purpose**: Development-only OAuth server for connector authentication
+**Purpose**: Development-only OAuth server for client authentication
 
 **Status**: ⚠️ **NOT FOR PRODUCTION** - Replace with proper identity service
 
@@ -416,11 +416,11 @@ For production deployments, replace with a proper identity/auth service:
 - `Program.cs`: ASP.NET Core setup
 - `TokenIssuer.cs`: Issues JWT access tokens
 - `JwksEndpoint.cs`: Exposes public keys for token validation
-- `InMemoryConnectorRepository.cs`: Stores connector registrations (ephemeral)
+- `InMemoryClientRepository.cs`: Stores client registrations (ephemeral)
 
 **When to Update**:
 - Adding more realistic development scenarios
-- Improving connector registration workflow for testing
+- Improving client registration workflow for testing
 - **Do NOT** extend for production use - replace instead
 
 ### Testing
@@ -438,19 +438,19 @@ docker compose ps
 cd samples/simple/Dbosoft.Bote.Samples.Simple.Cloud
 dotnet run
 
-# Run connector (separate terminal)
-cd samples/simple/Dbosoft.Bote.Samples.Simple.Connector
+# Run client (separate terminal)
+cd samples/simple/Dbosoft.Bote.Samples.Simple.Client
 dotnet run
 ```
 
 #### Samples
 
 - **Simple**: Basic request-response pattern (`samples/simple/`)
-  - Connector sends `PingMessage` → Cloud replies with `PongMessage`
-  - Cloud pushes `PushMessage` to specific connectors
+  - Client sends `PingMessage` → Cloud replies with `PongMessage`
+  - Cloud pushes `PushMessage` to specific clients
 
-- **Chat**: Multi-connector broadcast pattern (`samples/chat/`)
-  - Multiple connectors per tenant
+- **Chat**: Multi-client broadcast pattern (`samples/chat/`)
+  - Multiple clients per tenant
   - Topic-based broadcasting within tenant
   - Demonstrates tenant isolation
 
@@ -516,7 +516,7 @@ terraform apply
 1. Define message class in shared messages project
 2. Cloud: Add routing in `.Routing(r => r.TypeBased().Map<NewMessage>(...))`)
 3. Cloud: Add handler implementing `IHandleMessages<NewMessage>`
-4. Connector: Add routing and handler
+4. Client: Add routing and handler
 5. Test with samples
 
 #### Changing Queue Names
@@ -526,41 +526,141 @@ terraform apply
 3. Update docker-compose.yaml for local development
 4. Update infra deployment scripts
 
-#### Adding New Connector Features
+#### Adding New Client Features
 
 1. Add SignalR method to `Messages.cs` in BoteWorker
 2. Add corresponding method to `ISignalRClient` interface
 3. Implement in `SignalRClient.cs`
 4. Update `BoteTransport.cs` if transport-level changes needed
-5. Test with sample connector
+5. Test with sample client
 
 #### Debugging
 
 **Enable detailed logging**:
 - Cloud: `builder.Services.AddLogging(c => c.AddSimpleConsole().SetMinimumLevel(LogLevel.Debug))`
-- Connector: Same as above
+- Client: Same as above
 - BoteWorker: Already configured for Debug level in ApplicationInsights
 
 **Common Issues**:
 - **Authentication failures**: Check signing key format, token endpoint URL, JWKS endpoint accessibility
-- **Messages not routing**: Check `TenantId`/`ConnectorId` headers, verify queue names
-- **Connector not receiving messages**: Check SignalR connection status, verify subscription to topics
+- **Messages not routing**: Check `TenantId`/`ClientId` headers, verify queue names
+- **Client not receiving messages**: Check SignalR connection status, verify subscription to topics
 - **High polling costs**: Ensure `PendingMessagesIndicator` is working (should see "no messages" logs, not continuous polling)
+
+#### Azure Functions Queue Triggers - Client Configuration Requirements
+
+**Critical Rule**: Azure Functions queue triggers require a specifically configured `QueueServiceClient` with **Base64 message encoding** and matching connection string. Any queue used with `[QueueTrigger]` MUST be created using the correctly configured client.
+
+**Why This Matters**:
+1. **Message Encoding**: Azure Functions expects Base64-encoded queue messages. The `AzureWebJobsStorage` client is configured with `MessageEncoding = Base64`, while the default application client is NOT. Using the wrong client results in incompatible message encoding.
+2. **Connection String Matching**: The `[QueueTrigger(Connection = "AzureWebJobsStorage")]` attribute tells Azure Functions which connection string to use. The queue must be created using the same connection.
+3. **Failure Symptom**: Using the wrong client causes Azure Functions to fail deserializing messages immediately, moving them to poison queue after 5 attempts with NO logs from inside the function.
+
+**The Pattern**:
+
+```csharp
+// WRONG - Creates queue in application storage, trigger won't see it
+public async Task EnqueueJob(QueueServiceClient queueServiceClient)  // Default injected client
+{
+    var queue = queueServiceClient.GetQueueClient("my-trigger-queue");
+    await queue.SendMessageAsync(...);  // Goes to dbote:Worker:Storage:Connection
+}
+
+[Function("ProcessJob")]
+public async Task ProcessJob(
+    [QueueTrigger("my-trigger-queue", Connection = "AzureWebJobsStorage")]  // Monitors AzureWebJobsStorage
+    string message)
+{
+    // This will NEVER execute - watching wrong storage account!
+}
+
+// CORRECT - Creates queue in same storage account as trigger
+public async Task EnqueueJob(IAzureClientFactory<QueueServiceClient> queueClientFactory)
+{
+    var functionClient = queueClientFactory.CreateClient("AzureWebJobsStorage");
+    var queue = functionClient.GetQueueClient("my-trigger-queue");
+    await queue.SendMessageAsync(...);  // Goes to AzureWebJobsStorage
+}
+
+[Function("ProcessJob")]
+public async Task ProcessJob(
+    [QueueTrigger("my-trigger-queue", Connection = "AzureWebJobsStorage")]
+    string message)
+{
+    // This WILL execute - both use AzureWebJobsStorage
+}
+```
+
+**When to Use Each Client**:
+
+1. **`queueClientFactory.CreateClient("AzureWebJobsStorage")`**:
+   - For **infrastructure queues** monitored by Azure Functions triggers
+   - Examples: `databus-copy-monitor` queue
+   - **Configured with Base64 message encoding** (required by Azure Functions)
+   - Must match the `Connection` parameter in `[QueueTrigger]`
+   - May point to same storage account as application queues, but encoding differs
+
+2. **Default injected `QueueServiceClient`** (from line 52 in Program.cs):
+   - For **application data queues** NOT monitored by triggers
+   - Examples: `bote-{tenant}-{client}` message queues
+   - **No Base64 encoding** (default encoding)
+   - Uses `dbote:Worker:Storage:Connection` configuration
+   - Never use this for queues with `[QueueTrigger]` - encoding mismatch!
+
+**Client Configuration in Program.cs**:
+
+Both clients are registered in `Program.cs` (lines 48-58):
+```csharp
+builder.Services.AddAzureClients(clientBuilder =>
+{
+    // Default client - NO Base64 encoding (application data queues)
+    clientBuilder.AddQueueServiceClient(
+        builder.Configuration.GetSection("dbote:Worker:Storage:Connection"));
+
+    // Named client - WITH Base64 encoding (Azure Functions infrastructure queues)
+    clientBuilder.AddQueueServiceClient(builder.Configuration.GetSection("AzureWebJobsStorage"))
+        .WithName("AzureWebJobsStorage")
+        .ConfigureOptions(options =>
+            options.MessageEncoding = Azure.Storage.Queues.QueueMessageEncoding.Base64);
+});
+```
+
+**Real Example from Codebase**:
+
+See `Messages.AttachmentUploaded` (lines 708-711) for correct pattern:
+```csharp
+// MUST use named client for Base64 encoding
+var functionQueueClient = queueClientFactory.CreateClient("AzureWebJobsStorage");
+var monitorQueue = functionQueueClient.GetQueueClient("databus-copy-monitor");
+await monitorQueue.CreateIfNotExistsAsync();
+await monitorQueue.SendMessageAsync(JsonSerializer.Serialize(copyRequest));
+```
+
+This queue is monitored by `DataBusCopyFile.DataBusCopyFileMonitor`:
+```csharp
+[QueueTrigger("databus-copy-monitor", Connection = "AzureWebJobsStorage")]
+```
+
+**Symptom of This Bug**:
+- Messages reach `MaxDequeueCount` and move to poison queue immediately (5 failed attempts)
+- NO logs from inside the triggered function (not even first log line)
+- Azure Functions can't deserialize the incorrectly-encoded message
+- Even if both connection strings point to the same storage account, encoding mismatch causes failure
 
 ## Key Design Decisions
 
-### Single Service Bus Queue for All Connectors
+### Single Service Bus Queue for All Clients
 
-**Decision**: Route all connector-bound messages through one queue (`bote-connectors`)
+**Decision**: Route all client-bound messages through one queue (`bote-clients`)
 
 **Rationale**:
 - Azure Functions with Service Bus triggers require fixed queue names for auto-scaling
 - Dynamically creating queues per tenant would require polling (Event Grid triggers need Premium SKU)
 - Worker routes to individual Storage Queues after security validation
 
-### Storage Queues for Connector Access
+### Storage Queues for Client Access
 
-**Decision**: Use Storage Queues (not Service Bus) for connector-to-worker communication
+**Decision**: Use Storage Queues (not Service Bus) for client-to-worker communication
 
 **Rationale**:
 - HTTPS accessibility (port 443) vs. AMQP (ports 5671/5672 often blocked)
@@ -569,19 +669,19 @@ terraform apply
 
 ### SignalR Push Notifications
 
-**Decision**: Use SignalR to notify connectors of new messages instead of continuous polling
+**Decision**: Use SignalR to notify clients of new messages instead of continuous polling
 
 **Rationale**:
 - Eliminates wasteful polling of empty queues (reduces Azure transaction costs)
 - Lower latency (instant notification vs. polling interval)
-- Maintains Rebus transport abstraction (connectors use standard Rebus API)
+- Maintains Rebus transport abstraction (clients use standard Rebus API)
 
 ### Tenant-Aware Headers
 
-**Decision**: Inject `TenantId` and `ConnectorId` as message headers at security boundary
+**Decision**: Inject `TenantId` and `ClientId` as message headers at security boundary
 
 **Rationale**:
-- Prevents identity spoofing (connectors cannot set these headers)
+- Prevents identity spoofing (clients cannot set these headers)
 - Enables shared infrastructure with isolated routing
 - Cloud services can trust identity in headers
 - Simple programming model (headers, not custom API)
@@ -591,8 +691,8 @@ terraform apply
 **Decision**: Use Table Storage for subscription management + on-demand delivery
 
 **Rationale**:
-- Reactive pattern: Only active connectors receive broadcasts
-- No accumulated messages for offline connectors (they don't expect historical broadcasts)
+- Reactive pattern: Only active clients receive broadcasts
+- No accumulated messages for offline clients (they don't expect historical broadcasts)
 - Multi-instance safe (no in-memory state)
 - Economical (queries are cheap)
 
@@ -600,7 +700,7 @@ terraform apply
 
 When contributing to this repository:
 
-1. **Maintain Security Boundaries**: Never expose internal infrastructure to connectors
+1. **Maintain Security Boundaries**: Never expose internal infrastructure to clients
 2. **Preserve Multi-Tenancy**: All features must support tenant isolation
 3. **Test with Samples**: Verify changes with both simple and chat samples
 4. **Document Configuration**: Update this file and README.md for config changes

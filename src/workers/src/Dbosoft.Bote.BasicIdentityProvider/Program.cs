@@ -10,6 +10,6 @@ builder.ConfigureFunctionsWebApplication();
 builder.Services.Configure<TokenIssuerOptions>(builder.Configuration.GetSection("BasicIdentityProvider"));
 
 builder.Services.AddSingleton<ITokenCredentialsProvider, TokenCredentialsProvider>();
-builder.Services.AddSingleton<IConnectorRepository, InMemoryConnectorRepository>();
+builder.Services.AddSingleton<IClientRepository, InMemoryClientRepository>();
 
 builder.Build().Run();

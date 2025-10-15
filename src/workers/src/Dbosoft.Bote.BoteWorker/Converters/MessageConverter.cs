@@ -3,7 +3,7 @@
 // Licensed under MIT license https://github.com/rebus-org/Rebus.AzureServiceBus/blob/master/LICENSE.md
 
 using Azure.Messaging.ServiceBus;
-using Dbosoft.Bote.Rebus.Integration;
+using Dbosoft.Bote.Primitives;
 using Dbosoft.Bote.Transport.Abstractions;
 using Rebus.Extensions;
 using Rebus.Messages;
@@ -17,12 +17,11 @@ internal class MessageConverter : IMessageConverter
         var applicationProperties = serviceBusMessage.ApplicationProperties;
         // TODO filter headers
         var headers = applicationProperties
-            .Where(kvp => kvp.Key != BoteHeaders.TenantId && kvp.Key != BoteHeaders.ConnectorId)
-            .Select(kvp => new KeyValuePair<string, string?>(kvp.Key, (string?)kvp.Value))
+            .Where(kvp => kvp.Key != BoteHeaders.TenantId && kvp.Key != BoteHeaders.ClientId)
+            .Select(kvp => new KeyValuePair<string, string?>(kvp.Key, Convert.ToString(kvp.Value)))
             .ToDictionary();
             
         headers[Headers.TimeToBeReceived] = serviceBusMessage.TimeToLive.ToString();
-        // TODO do we care about the content type?
         headers[Headers.ContentType] = serviceBusMessage.ContentType;
         headers[Headers.CorrelationId] = serviceBusMessage.CorrelationId;
         headers[Headers.MessageId] = serviceBusMessage.MessageId;

@@ -6,7 +6,7 @@ public class BoteCredentials
 {
     public string? TenantId { get; set; }
 
-    public string? ConnectorId { get; set; }
+    public string? ClientId { get; set; }
 
     public SecurityKey? SigningKey { get; set; }
 

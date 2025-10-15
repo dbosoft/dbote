@@ -1,4 +1,4 @@
-﻿using Dbosoft.Bote.Rebus.Integration;
+﻿using Dbosoft.Bote.Primitives;
 using Dbosoft.Bote.Samples.Chat.Messages;
 using Microsoft.Extensions.Logging;
 using Rebus.Bus;
@@ -15,18 +15,15 @@ public class ChatRequestHandler(
     public async Task Handle(ChatRequest message)
     {
         var tenantId = MessageContext.Current.Headers[BoteHeaders.TenantId];
-        var senderConnectorId = MessageContext.Current.Headers[BoteHeaders.ConnectorId];
+        var senderClientId = MessageContext.Current.Headers[BoteHeaders.ClientId];
 
-        logger.LogInformation("Broadcasting chat from connector {ConnectorId} of tenant {TenantId}",
-            senderConnectorId, tenantId);
+        logger.LogInformation("Broadcasting chat from client {ClientId} of tenant {TenantId}",
+            senderClientId, tenantId);
 
-        // Send ONE message with Topic header
-        // Worker will store it and notify SignalR group
-        // Active connectors in group will request and receive the message
         await bus.Send(new ChatResponse()
         {
             Id = message.Id,
-            Author = senderConnectorId,
+            Author = senderClientId,
             Message = message.Message,
         }, new Dictionary<string, string>()
         {

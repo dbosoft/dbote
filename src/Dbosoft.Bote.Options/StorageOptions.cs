@@ -1,6 +1,6 @@
 ﻿namespace Dbosoft.Bote.Options;
 
-public class StorageOptions
+public class ClientStorageOptions
 {
     public string Connection { get; set; } = null!;
 

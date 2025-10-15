@@ -1,5 +1,5 @@
 services:
-  connector-init:
+  client-init:
     environment:
       "IdentityProviderUrl": "http://basicidentityprovider"
 
@@ -8,12 +8,12 @@ services:
     - "7312:7312"
 
 configs:
-  connectors:
+  clients:
     content: |
       [
         {
           "TenantId": "tenant-a",
-          "ConnectorId": "connector-a",
+          "ClientId": "client-a",
           "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDSfgIieGaVTF7RLRoo0HH/xUjg3T8jHr1RkxeRBqwy7lAGBG6Y4Pnlka0qqVARrx3TVuMHhmRSQnu1KfFgKnuA=="
         }
       ]
@@ -82,7 +82,7 @@ configs:
                   }
                 },
                 {
-                  "Name": "bote-benchmark-connectors",
+                  "Name": "bote-benchmark-clients",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",

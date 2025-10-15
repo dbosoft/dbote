@@ -48,7 +48,8 @@ public static class BoteConfigurationExtensions
             return rebusOptions;
         });
 
-        configurer.OtherService<ITimeoutManager>().Register(_ => new DisabledTimeoutManager(), description: TimeoutManagerText);
+        configurer.OtherService<ITimeoutManager>()
+            .Register(_ => new DisabledTimeoutManager(), description: TimeoutManagerText);
 
         configurer.OtherService<IPipeline>().Decorate(c =>
         {
@@ -65,8 +66,11 @@ public static class BoteConfigurationExtensions
         configurer.OtherService<ISignalRClient>()
             .Register(c =>
             {
+                var loggerFactory = c.Get<IRebusLoggerFactory>();
                 var pendingMessagesIndicator = c.Get<IPendingMessagesIndicators>();
-                return new SignalRClient(endpointUri, credentials, pendingMessagesIndicator, httpClientFactory);
+                return new SignalRClient(endpointUri, credentials, pendingMessagesIndicator,
+                    loggerFactory,
+                    httpClientFactory);
             });
 
         configurer.OtherService<BoteTransport>().Register(c =>
@@ -91,5 +95,6 @@ public static class BoteConfigurationExtensions
         });
 
         configurer.Register(c => c.Get<BoteTransport>());
+
     }
 }

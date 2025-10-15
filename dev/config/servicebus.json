@@ -19,7 +19,7 @@
             }
           },
           {
-            "Name": "bote-dev-connectors",
+            "Name": "bote-dev-clients",
             "Properties": {
               "DeadLetteringOnMessageExpiration": false,
               "DefaultMessageTimeToLive": "PT1H",

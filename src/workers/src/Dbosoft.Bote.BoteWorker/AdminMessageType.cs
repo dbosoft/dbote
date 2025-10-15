@@ -5,6 +5,6 @@ namespace Dbosoft.Bote.BoteWorker;
 /// </summary>
 internal enum AdminMessageType
 {
-    RemoveConnector,
+    RemoveClient,
     RemoveSubscriptions
 }

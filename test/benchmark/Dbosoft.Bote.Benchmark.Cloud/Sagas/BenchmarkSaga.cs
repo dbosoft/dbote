@@ -14,7 +14,7 @@ public class BenchmarkSaga(
     : Saga<BenchmarkSagaData>,
     IAmInitiatedBy<BenchmarkRequest>,
     IHandleMessages<ServiceResponse>,
-    IHandleMessages<ConnectorResponse>
+    IHandleMessages<ClientResponse>
 {
     public async Task Handle(BenchmarkRequest message)
     {
@@ -31,9 +31,9 @@ public class BenchmarkSaga(
             return;
         }
 
-        if (message.Type is BenchmarkType.Connector)
+        if (message.Type is BenchmarkType.Client)
         {
-            await bus.Send(new ConnectorRequest()
+            await bus.Send(new ClientRequest()
             {
                 RequestId = message.RequestId,
             });
@@ -52,7 +52,7 @@ public class BenchmarkSaga(
         throw new ArgumentException($"The message benchmark type '{message.Type}' is not supported", nameof(message));
     }
 
-    public async Task Handle(ConnectorResponse message)
+    public async Task Handle(ClientResponse message)
     {
         await Reply(new BenchmarkResponse()
         {
@@ -82,7 +82,7 @@ public class BenchmarkSaga(
         config.Correlate<ServiceResponse>(
             response => response.RequestId,
             sagaData => sagaData.RequestId);
-        config.Correlate<ConnectorResponse>(
+        config.Correlate<ClientResponse>(
             response => response.RequestId,
             sagaData => sagaData.RequestId);
     }

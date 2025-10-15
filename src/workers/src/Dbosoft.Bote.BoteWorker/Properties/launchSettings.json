@@ -14,12 +14,12 @@
         "dbote__Worker__Storage__Prefix": "bote-sample-chat",
         "dbote__Worker__ServiceBus__Connection": "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;",
         "dbote__Worker__ServiceBus__Queues__Cloud": "bote-sample-chat-cloud",
-        "dbote__Worker__ServiceBus__Queues__Connectors": "bote-sample-chat-connectors",
+        "dbote__Worker__ServiceBus__Queues__Clients": "bote-sample-chat-clients ",
         "dbote__Worker__ServiceBus__Queues__Error": "bote-sample-chat-error",
         "dbote__Worker__SignalR__Connection": "Endpoint=http://localhost;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;",
-        "dbote__Worker__OpenId__Authority": "http://localhost:7250",
         "dbote__Worker__OpenId__JwksUri": "http://localhost:7250/api/.well-known/jwks.json",
-        "dbote__Worker__OpenId__Audience": "http://localhost:7249/api",
+        "dbote__Worker__OpenId__Authority": "http://basicidentityprovider",
+        "dbote__Worker__OpenId__Audience": "http://dbote-worker/api",
         "dbote__Worker__OpenId__RequiredScope": "bote"
       }
     },
@@ -32,12 +32,12 @@
         "dbote__Worker__Storage__Prefix": "bote-sample-simple",
         "dbote__Worker__ServiceBus__Connection": "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;",
         "dbote__Worker__ServiceBus__Queues__Cloud": "bote-sample-simple-cloud",
-        "dbote__Worker__ServiceBus__Queues__Connectors": "bote-sample-simple-connectors",
+        "dbote__Worker__ServiceBus__Queues__Clients": "bote-sample-simple-clients",
         "dbote__Worker__ServiceBus__Queues__Error": "bote-sample-simple-error",
         "dbote__Worker__SignalR__Connection": "Endpoint=http://localhost;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;",
-        "dbote__Worker__OpenId__Authority": "http://localhost:7250",
         "dbote__Worker__OpenId__JwksUri": "http://localhost:7250/api/.well-known/jwks.json",
-        "dbote__Worker__OpenId__Audience": "http://localhost:7249/api",
+        "dbote__Worker__OpenId__Authority": "http://basicidentityprovider",
+        "dbote__Worker__OpenId__Audience": "http://dbote-worker/api",
         "dbote__Worker__OpenId__RequiredScope": "bote"
       }
     }

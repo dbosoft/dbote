@@ -1,4 +1,3 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.33530.505
@@ -31,13 +30,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Rebus", "src\c
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Rebus.Integration", "src\Dbosoft.Bote.Rebus.Integration\Dbosoft.Bote.Rebus.Integration.csproj", "{1F491810-0D2A-4275-BDBB-8A187FC85E7E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Samples.Simple.Connector", "samples\simple\Dbosoft.Bote.Samples.Simple.Connector\Dbosoft.Bote.Samples.Simple.Connector.csproj", "{FB7D1D38-1D5C-C8C0-6A76-D3DDF9495F04}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Samples.Simple.Client", "samples\simple\Dbosoft.Bote.Samples.Simple.Client\Dbosoft.Bote.Samples.Simple.Client.csproj", "{FB7D1D38-1D5C-C8C0-6A76-D3DDF9495F04}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Integration.Abstractions", "src\Dbosoft.Bote.Integration.Abstractions\Dbosoft.Bote.Integration.Abstractions.csproj", "{94352C81-17F1-4C28-BE68-25C9F062AD9F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Benchmark.Cloud", "test\benchmark\Dbosoft.Bote.Benchmark.Cloud\Dbosoft.Bote.Benchmark.Cloud.csproj", "{6FE339F8-F3C6-49CC-A4CD-FD428924287C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Benchmark.Connector", "test\benchmark\Dbosoft.Bote.Benchmark.Connector\Dbosoft.Bote.Benchmark.Connector.csproj", "{DD3784A2-A609-42A3-816A-4813E2593F1D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Benchmark.Client", "test\benchmark\Dbosoft.Bote.Benchmark.Client\Dbosoft.Bote.Benchmark.Client.csproj", "{DD3784A2-A609-42A3-816A-4813E2593F1D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Benchmark.Service", "test\benchmark\Dbosoft.Bote.Benchmark.Service\Dbosoft.Bote.Benchmark.Service.csproj", "{4B4F7C5B-0707-42F1-8A3F-624379FBC536}"
 EndProject
@@ -45,7 +44,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Benchmark.Mess
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Benchmark.Runner", "test\benchmark\Dbosoft.Bote.Benchmark.Runner\Dbosoft.Bote.Benchmark.Runner.csproj", "{86186B78-622E-4C5C-9C07-B518D6932789}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Connector.KeyGenerator", "src\client\src\Dbosoft.Bote.Connector.KeyGenerator\Dbosoft.Bote.Connector.KeyGenerator.csproj", "{F5DC3DC8-C544-4B23-8882-55BC6DC506E0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Client.KeyGenerator", "src\client\src\Dbosoft.Bote.Client.KeyGenerator\Dbosoft.Bote.Client.KeyGenerator.csproj", "{F5DC3DC8-C544-4B23-8882-55BC6DC506E0}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{A9C186A6-0424-4EBB-9BE0-39890C95B0A9}"
 EndProject
@@ -53,27 +52,31 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "benchmark", "benchmark", "{
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.BoteWorker.Tests", "src\workers\tests\Dbosoft.Bote.BusWorker.Tests\Dbosoft.Bote.BoteWorker.Tests\Dbosoft.Bote.BoteWorker.Tests.csproj", "{7890CF65-B883-4711-992E-8D4BE72B1E62}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConnectorSetupTool", "dev\management\ConnectorSetupTool\ConnectorSetupTool.csproj", "{34135E5E-60C1-43F5-AB3C-E6B13E66DDB1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientSetupTool", "dev\management\ClientSetupTool\ClientSetupTool.csproj", "{34135E5E-60C1-43F5-AB3C-E6B13E66DDB1}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "chat", "chat", "{22B6D60F-A6D8-400A-A87A-A94AB6683671}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Samples.Chat.Cloud", "samples\chat\Dbosoft.Bote.Samples.Chat.Cloud\Dbosoft.Bote.Samples.Chat.Cloud.csproj", "{049BD44F-D343-4D67-84C7-ED474C0463F7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Samples.Chat.Connector", "samples\chat\Dbosoft.Bote.Samples.Chat.Connector\Dbosoft.Bote.Samples.Chat.Connector.csproj", "{321CBE29-E71A-4081-BE47-562B7F11507D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Samples.Chat.Client", "samples\chat\Dbosoft.Bote.Samples.Chat.Client\Dbosoft.Bote.Samples.Chat.Client.csproj", "{321CBE29-E71A-4081-BE47-562B7F11507D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Samples.Chat.Messages", "samples\chat\Dbosoft.Bote.Samples.Chat.Messages\Dbosoft.Bote.Samples.Chat.Messages.csproj", "{6A37D5EB-E4FA-ED52-74A6-C5B7FE67CFC0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Options", "src\Dbosoft.Bote.Options\Dbosoft.Bote.Options.csproj", "{1DFAF677-CF51-4BD1-A4F0-BE22FA1DF062}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Connector.Options", "src\client\src\Dbosoft.Bote.Connector.Options\Dbosoft.Bote.Connector.Options.csproj", "{36DD1A76-10A4-4A46-8B08-0C561628DB98}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Client.Options", "src\client\src\Dbosoft.Bote.Client.Options\Dbosoft.Bote.Client.Options.csproj", "{36DD1A76-10A4-4A46-8B08-0C561628DB98}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Connector.Authentication", "src\client\src\Dbosoft.Bote.Connector.Authentication\Dbosoft.Bote.Connector.Authentication.csproj", "{C9909CDC-959C-4F24-8FF6-BA24508DD33A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Client.Authentication", "src\client\src\Dbosoft.Bote.Client.Authentication\Dbosoft.Bote.Client.Authentication.csproj", "{C9909CDC-959C-4F24-8FF6-BA24508DD33A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.AppConfiguration", "src\Dbosoft.Bote.AppConfiguration\Dbosoft.Bote.AppConfiguration.csproj", "{454C46FA-B467-94D1-1327-3716221133B7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Connector.KeyGenerator.Tests", "test\Dbosoft.Bote.Connector.KeyGenerator.Tests\Dbosoft.Bote.Connector.KeyGenerator.Tests.csproj", "{60DB1698-F2DD-4C24-B921-B72533D4E847}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Client.KeyGenerator.Tests", "test\Dbosoft.Bote.Client.KeyGenerator.Tests\Dbosoft.Bote.Client.KeyGenerator.Tests.csproj", "{60DB1698-F2DD-4C24-B921-B72533D4E847}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.BasicIdentityProvider", "src\workers\src\Dbosoft.Bote.BasicIdentityProvider\Dbosoft.Bote.BasicIdentityProvider.csproj", "{EBC49B5D-646C-97B6-A7F4-690B4A4699F9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.Primitives", "src\Dbosoft.Bote.Primitives\Dbosoft.Bote.Primitives.csproj", "{E3AA162D-AA58-D58D-6A83-3E7BDE6273E2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dbosoft.Bote.StorageInit", "src\workers\src\Dbosoft.Bote.StorageInit\Dbosoft.Bote.StorageInit.csproj", "{7C5A4A60-1F61-977B-E3CB-3AEF218BF35E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -193,6 +196,14 @@ Global
 		{EBC49B5D-646C-97B6-A7F4-690B4A4699F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EBC49B5D-646C-97B6-A7F4-690B4A4699F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EBC49B5D-646C-97B6-A7F4-690B4A4699F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E3AA162D-AA58-D58D-6A83-3E7BDE6273E2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E3AA162D-AA58-D58D-6A83-3E7BDE6273E2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E3AA162D-AA58-D58D-6A83-3E7BDE6273E2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E3AA162D-AA58-D58D-6A83-3E7BDE6273E2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7C5A4A60-1F61-977B-E3CB-3AEF218BF35E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7C5A4A60-1F61-977B-E3CB-3AEF218BF35E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7C5A4A60-1F61-977B-E3CB-3AEF218BF35E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C5A4A60-1F61-977B-E3CB-3AEF218BF35E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -223,6 +234,7 @@ Global
 		{C9909CDC-959C-4F24-8FF6-BA24508DD33A} = {36F2479B-AD7A-4F10-B758-6512AD532C56}
 		{60DB1698-F2DD-4C24-B921-B72533D4E847} = {A9C186A6-0424-4EBB-9BE0-39890C95B0A9}
 		{EBC49B5D-646C-97B6-A7F4-690B4A4699F9} = {CA11CD38-51E3-4166-8AE4-16B91C87D921}
+		{7C5A4A60-1F61-977B-E3CB-3AEF218BF35E} = {CA11CD38-51E3-4166-8AE4-16B91C87D921}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {CFD7CBDA-680B-4BCE-BEF5-7543167CA02E}

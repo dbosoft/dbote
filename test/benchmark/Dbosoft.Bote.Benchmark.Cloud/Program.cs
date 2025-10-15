@@ -29,7 +29,7 @@ builder.Services.AddRebus((configure, serviceProvider) =>
     var serviceQueueName = builder.Configuration["dbote:Cloud:ServiceBus:Queues:Service"];
     return configure
         .Options(b => b.RetryStrategy(errorQueueName: options.Queues.Error))
-        .Options(o => o.EnableBote(options.Queues.Connectors))
+        .Options(o => o.EnableBote(options.Queues.Clients))
         .Transport(t => t.UseAzureServiceBus(
             builder.Configuration.GetSection("dbote:Cloud:ServiceBus:Connection"),
             options.Queues.Cloud))
@@ -37,7 +37,7 @@ builder.Services.AddRebus((configure, serviceProvider) =>
         .Sagas(s => s.StoreInMemory())
         .Logging(l => l.MicrosoftExtensionsLogging(serviceProvider.GetRequiredService<ILoggerFactory>()))
         .Routing(r => r.TypeBased()
-            .Map<ConnectorRequest>($"{options.Queues.Connectors}-connector-a")
+            .Map<ClientRequest>($"{options.Queues.Clients}-client-a")
             .Map<ServiceRequest>(serviceQueueName));
 });
 

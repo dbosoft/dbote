@@ -14,7 +14,7 @@ namespace Dbosoft.Bote.BasicIdentityProvider;
 public class TokenIssuer(
     ITokenCredentialsProvider tokenCredentialsProvider,
     IOptions<TokenIssuerOptions> options,
-    IConnectorRepository connectorRepository,
+    IClientRepository clientRepository,
     ILogger<TokenIssuer> logger)
 {
     [Function("token")]
@@ -43,47 +43,47 @@ public class TokenIssuer(
         var handler = new JsonWebTokenHandler();
         var assertionToken = handler.ReadJsonWebToken(clientAssertion);
 
-        // Extract connector ID from standard sub claim - tenant comes from URL route
-        if (!assertionToken.TryGetValue("sub", out string connectorId) || string.IsNullOrEmpty(connectorId)
-            || assertionToken.Subject != connectorId)
+        // Extract client ID from standard sub claim - tenant comes from URL route
+        if (!assertionToken.TryGetValue("sub", out string clientId) || string.IsNullOrEmpty(clientId)
+            || assertionToken.Subject != clientId)
         {
             logger.LogWarning("Invalid client assertion: missing or invalid sub claim");
             return new BadRequestResult();
         }
 
-        var connector = await connectorRepository.GetById(tenantId, connectorId);
-        if (connector == null)
+        var client = await clientRepository.GetById(tenantId, clientId);
+        if (client == null)
         {
-            logger.LogWarning("Connector with tenant ID '{TenantId}' and connector ID '{ConnectorId}' not found.", tenantId, connectorId);
+            logger.LogWarning("Client with tenant ID '{TenantId}' and client ID '{ClientId}' not found.", tenantId, clientId);
             return new BadRequestResult();
         }
 
-        var connectorEcdsa = ECDsa.Create();
-        connectorEcdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(connector.PublicKey), out _);
-        var connectorKey = new ECDsaSecurityKey(connectorEcdsa)
+        var clientEcdsa = ECDsa.Create();
+        clientEcdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(client.PublicKey), out _);
+        var clientKey = new ECDsaSecurityKey(clientEcdsa)
         {
-            KeyId = connectorId,
+            KeyId = clientId,
         };
 
         logger.LogInformation("Expected audience: {Audience}", options.Value.Authority);
 
-        // Validate client assertion: issuer must be connector ID, audience must be authority
+        // Validate client assertion: issuer must be client  ID, audience must be authority
         var assertionTokenResult = await handler.ValidateTokenAsync(assertionToken, new TokenValidationParameters()
         {
-            ValidIssuer = connectorId,
+            ValidIssuer = clientId,
             ValidAudience = options.Value.Authority,
-            IssuerSigningKey = connectorKey,
+            IssuerSigningKey = clientKey,
         });
 
         if (!assertionTokenResult.IsValid)
         {
             logger.LogInformation(assertionTokenResult.Exception,
-                "Validation of client assertion token for connector with tenant ID '{TenantId}' and connector ID '{ConnectorId}' failed:",
-                tenantId, connectorId);
+                "Validation of client assertion token for client with tenant ID '{TenantId}' and client ID '{ClientId}' failed:",
+                tenantId, clientId);
             return new BadRequestResult();
         }
 
-        var accessToken = CreateAccessToken(tenantId, connectorId);
+        var accessToken = CreateAccessToken(tenantId, clientId);
         return new JsonResult(new Dictionary<string, object>()
         {
             [OpenIdConnectParameterNames.AccessToken] = accessToken,
@@ -93,15 +93,15 @@ public class TokenIssuer(
         });
     }
 
-    private string CreateAccessToken(string tenantId, string connectorId)
+    private string CreateAccessToken(string tenantId, string clientId)
     {
         var tokenCredentials = tokenCredentialsProvider.GetSigningCredentials();
         var handler = new JsonWebTokenHandler();
 
         var subject = new ClaimsIdentity(
         [
-            new Claim(JwtRegisteredClaimNames.Sub, connectorId),
-            new Claim("tid", tenantId),  // Azure AD standard tenant ID claim
+            new Claim(JwtRegisteredClaimNames.Sub, clientId),
+            new Claim("tid", tenantId), 
             new Claim("scope", "bote"),
         ]);
 

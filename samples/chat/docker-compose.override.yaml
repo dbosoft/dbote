@@ -1,26 +1,42 @@
 services:
-  connector-init:
+  basicidentityprovider:
+    ports:
+      - "7250:80"
+
+  dbote-worker:
+    ports:
+      - "7249:80"
+
+  signalr:
+    ports:
+      - "8888:8888"
+
+  storage-init:
+    environment:
+      "BLOB_CONTAINERS": "bote-outbox,bote-inbox"
+
+  client-init:
     environment:
       "IdentityProviderUrl": "http://basicidentityprovider"
 
 configs:
-  connectors:
+  clients:
     content: |
       [
         {
           "TenantId": "tenant-a",
-          "ConnectorId": "connector-a",
+          "ClientId": "client-a",
           "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDSfgIieGaVTF7RLRoo0HH/xUjg3T8jHr1RkxeRBqwy7lAGBG6Y4Pnlka0qqVARrx3TVuMHhmRSQnu1KfFgKnuA=="
         }
         ,
         {
           "TenantId": "tenant-a",
-          "ConnectorId": "connector-b",
+          "ClientId": "client-b",
           "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEL3yIgvcG9Cyrzv1KU0pr/Rxrf4N64MEDjYLXeIYupnFXfbhAnLRyb6SGNLlnSm9YE8HIR1JQdi5fY57mS++PkA=="
         },
         {
           "TenantId": "tenant-b",
-          "ConnectorId": "connector-a",
+          "ClientId": "client-a",
           "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcu3L06Rb7OoM5va6o+qNPtH6qCNuGoUAWTpkYUAjZCzzW8zOQSXoHY5Uk6OG9+W5f1JVOtU/SKEggSv5QQTx9A=="
         }
       ]
@@ -34,6 +50,20 @@ configs:
               "Queues": [
                 {
                   "Name": "bote-sample-chat-cloud",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "bote-sample-chat-cloud-incoming",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",
@@ -61,7 +91,7 @@ configs:
                   }
                 },
                 {
-                  "Name": "bote-sample-chat-connectors",
+                  "Name": "bote-sample-chat-clients",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,
                     "DefaultMessageTimeToLive": "PT1H",
@@ -88,7 +118,7 @@ configs:
                     "RequiresSession": false
                   }
                 }
-              ],
+              ]
             }
           ],
           "Logging": {

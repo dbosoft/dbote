@@ -2,7 +2,6 @@
 
 public static class ClaimNames
 {
-    public static readonly string TenantId = "dbote_tenant_id";
-
-    public static readonly string ConnectorId = "dbote_connector_id";
+    public static readonly string TenantId = "bote_tenant_id";
+    public static readonly string ClientId = "bote_client_id";
 }

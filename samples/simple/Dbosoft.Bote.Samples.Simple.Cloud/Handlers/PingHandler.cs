@@ -1,4 +1,4 @@
-﻿using Dbosoft.Bote.Rebus.Integration;
+﻿using Dbosoft.Bote.Primitives;
 using Dbosoft.Bote.Samples.Simple.Messages;
 using Microsoft.Extensions.Logging;
 using Rebus.Bus;
@@ -22,7 +22,7 @@ public class PingHandler(
         }, new Dictionary<string, string>()
         {
             [BoteHeaders.TenantId] = MessageContext.Current.Headers[BoteHeaders.TenantId],
-            [BoteHeaders.ConnectorId] = MessageContext.Current.Headers[BoteHeaders.ConnectorId],
+            [BoteHeaders.ClientId] = MessageContext.Current.Headers[BoteHeaders.ClientId],
         });
     }
 }

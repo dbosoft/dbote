@@ -1,22 +1,22 @@
 namespace Dbosoft.Bote.BoteWorker;
 
 /// <summary>
-/// Internal message to remove a connector and all its subscriptions.
+/// Internal message to remove a client and all its subscriptions.
 /// Can be published by management/admin tools.
 /// </summary>
-internal record RemoveConnector
+internal record RemoveClient
 {
     public required string TenantId { get; init; }
-    public required string ConnectorId { get; init; }
+    public required string ClientId { get; init; }
 }
 
 /// <summary>
-/// Internal message to remove specific subscriptions for a connector (batch operation).
-/// Can be published by management/admin tools or by the connector itself.
+/// Internal message to remove specific subscriptions for a client (batch operation).
+/// Can be published by management/admin tools or by the client itself.
 /// </summary>
 internal record RemoveSubscriptions
 {
     public required string TenantId { get; init; }
-    public required string ConnectorId { get; init; }
+    public required string ClientId { get; init; }
     public required List<string> Topics { get; init; }
 }

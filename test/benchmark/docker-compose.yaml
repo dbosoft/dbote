@@ -23,7 +23,7 @@ services:
     depends_on:
       servicebus-health:
         condition: service_healthy
-      connector-init:
+      client-init:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/admin/host/status?code=master-secret"]
@@ -42,7 +42,7 @@ services:
       "dbote__Worker__Storage__Prefix": "bote-benchmark"
       "dbote__Worker__ServiceBus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
       "dbote__Worker__ServiceBus__Queues__Cloud": "bote-benchmark-cloud"
-      "dbote__Worker__ServiceBus__Queues__Connectors": "bote-benchmark-connectors"
+      "dbote__Worker__ServiceBus__Queues__Clients": "bote-benchmark-clients"
       "dbote__Worker__ServiceBus__Queues__Error": "bote-benchmark-error"
       "dbote__Worker__SignalR__Connection": "Endpoint=http://signalr;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;"
       "dbote__Worker__OpenId__Authority": "http://basicidentityprovider"
@@ -59,27 +59,27 @@ services:
     environment:
       "dbote__Cloud__Servicebus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
       "dbote__Cloud__ServiceBus__Queues__Cloud": "bote-benchmark-cloud"
-      "dbote__Cloud__ServiceBus__Queues__Connectors": "bote-benchmark-connectors"
+      "dbote__Cloud__ServiceBus__Queues__Clients": "bote-benchmark-clients"
       "dbote__Cloud__ServiceBus__Queues__Error": "bote-benchmark-error"
       "dbote__Cloud__ServiceBus__Queues__Service": "bote-benchmark-service"
 
-  connector:
+  client:
     depends_on:
       dbote-worker:
         condition: service_healthy
     build:
-      context: ./Dbosoft.Bote.Benchmark.Connector
+      context: ./Dbosoft.Bote.Benchmark.Client
     environment:
-      "dbote__Connector__Endpoint": "http://dbote-worker/api"
-      "dbote__Connector__ConnectorId": "connector-a"
-      "dbote__Connector__TenantId": "tenant-a"
-      "dbote__Connector__Authentication__Authority": "http://basicidentityprovider"
-      "dbote__Connector__Authentication__TokenEndpoint": "http://basicidentityprovider/api/tenant-a/token"
-      "dbote__Connector__Authentication__Scope": "bote"
-      "dbote__Connector__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGZfhjhITuJz0BkkS3yYezLelZOm1Lhma4/owsRcj6kuhRANCAAQNJ+AiJ4ZpVMXtEtGijQcf/FSODdPyMevVGTF5EGrDLuUAYEbpjg+eWRrSqpUBGvHdNW4weGZFJCe7Up8WAqe4"
-      "dbote__Connector__Queues__Cloud": "bote-benchmark-cloud"
-      "dbote__Connector__Queues__Connectors": "bote-benchmark-connectors"
-      "dbote__Connector__Queues__Error": "bote-benchmark-error"
+      "dbote__Client__Endpoint": "http://dbote-worker/api"
+      "dbote__Client__ClientId": "client-a"
+      "dbote__Client__TenantId": "tenant-a"
+      "dbote__Client__Authentication__Authority": "http://basicidentityprovider"
+      "dbote__Client__Authentication__TokenEndpoint": "http://basicidentityprovider/api/tenant-a/token"
+      "dbote__Client__Authentication__Scope": "bote"
+      "dbote__Client__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGZfhjhITuJz0BkkS3yYezLelZOm1Lhma4/owsRcj6kuhRANCAAQNJ+AiJ4ZpVMXtEtGijQcf/FSODdPyMevVGTF5EGrDLuUAYEbpjg+eWRrSqpUBGvHdNW4weGZFJCe7Up8WAqe4"
+      "dbote__Client__Queues__Cloud": "bote-benchmark-cloud"
+      "dbote__Client__Queues__Clients": "bote-benchmark-clients"
+      "dbote__Client__Queues__Error": "bote-benchmark-error"
 
   service:
     depends_on:

@@ -27,15 +27,15 @@ builder.Services.AddRebus((configure, serviceProvider) =>
     var options = serviceProvider.GetRequiredService<IOptions<ServiceBusOptions>>().Value;
     return configure
         .Options(b => b.RetryStrategy(errorQueueName: options.Queues.Error))
-        .Options(o => o.EnableBote(options.Queues.Connectors))
+        .Options(o => o.EnableBote(options.Queues.Clients))
         .Transport(t => t.UseAzureServiceBus(
             builder.Configuration.GetSection("dbote:Cloud:ServiceBus:Connection"),
             options.Queues.Cloud))
         .Serialization(s => s.UseSystemTextJson())
         .Logging(l => l.MicrosoftExtensionsLogging(serviceProvider.GetRequiredService<ILoggerFactory>()))
         .Routing(r => r.TypeBased()
-            .Map<PongMessage>($"{options.Queues.Connectors}-connector-a")
-            .Map<PushMessage>($"{options.Queues.Connectors}-connector-a"));
+            .Map<PongMessage>($"{options.Queues.Clients}-client-a")
+            .Map<PushMessage>($"{options.Queues.Clients}-client-a"));
 });
 
 builder.Services.AddRebusHandler<PingHandler>();

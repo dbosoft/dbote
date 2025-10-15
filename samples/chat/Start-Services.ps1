@@ -14,8 +14,8 @@ Write-Host "Publishing Cloud service..." -ForegroundColor Yellow
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
-Push-Location ./Dbosoft.Bote.Samples.Chat.Connector
-Write-Host "Publishing Chat Connector..." -ForegroundColor Yellow
+Push-Location ./Dbosoft.Bote.Samples.Chat.Client
+Write-Host "Publishing Chat Client..." -ForegroundColor Yellow
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
@@ -42,11 +42,11 @@ Write-Host "============================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Once started, open these URLs in your browser:" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  Tenant A - Connector A: " -NoNewline -ForegroundColor White
+Write-Host "  Tenant A - Client A: " -NoNewline -ForegroundColor White
 Write-Host "http://localhost:5000" -ForegroundColor Yellow
-Write-Host "  Tenant A - Connector B: " -NoNewline -ForegroundColor White
+Write-Host "  Tenant A - Client B: " -NoNewline -ForegroundColor White
 Write-Host "http://localhost:5001" -ForegroundColor Yellow
-Write-Host "  Tenant B - Connector A: " -NoNewline -ForegroundColor White
+Write-Host "  Tenant B - Client A: " -NoNewline -ForegroundColor White
 Write-Host "http://localhost:5002" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Demo: Messages between 5000 and 5001 work (same tenant)" -ForegroundColor Green

@@ -11,7 +11,7 @@ internal interface IPendingMessagesIndicators
 
 internal sealed class PendingMessagesIndicators : IPendingMessagesIndicators, IDisposable
 {
-    private SemaphoreSlim _semaphore = new(1, 1);
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
     private bool _flag;
 
     public async Task ClearAsync()

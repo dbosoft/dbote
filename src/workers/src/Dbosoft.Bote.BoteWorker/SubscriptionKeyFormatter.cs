@@ -29,14 +29,14 @@ internal static class SubscriptionKeyFormatter
     }
 
     /// <summary>
-    /// Creates a row key for subscription storage: {sanitized_connectorId}
+    /// Creates a row key for subscription storage: {sanitized_clientId}
     /// </summary>
-    public static string CreateRowKey(string connectorId)
+    public static string CreateRowKey(string clientId)
     {
-        if (string.IsNullOrWhiteSpace(connectorId))
-            throw new ArgumentException("ConnectorId cannot be null or whitespace", nameof(connectorId));
+        if (string.IsNullOrWhiteSpace(clientId))
+            throw new ArgumentException("ClientId cannot be null or whitespace", nameof(clientId));
 
-        return SanitizeAndNormalize(connectorId);
+        return SanitizeAndNormalize(clientId);
     }
 
     /// <summary>

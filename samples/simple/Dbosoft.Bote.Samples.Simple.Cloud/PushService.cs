@@ -1,4 +1,4 @@
-﻿using Dbosoft.Bote.Rebus.Integration;
+﻿using Dbosoft.Bote.Primitives;
 using Dbosoft.Bote.Samples.Simple.Messages;
 using Microsoft.Extensions.Hosting;
 using Rebus.Bus;
@@ -20,7 +20,7 @@ public class PushService(IBus bus) : BackgroundService
             }, new Dictionary<string, string>()
             {
                 [BoteHeaders.TenantId] = "tenant-a",
-                [BoteHeaders.ConnectorId] = "connector-a",
+                [BoteHeaders.ClientId] = "client-a",
             });
 
             await bus.Send(new PushMessage()
@@ -30,7 +30,7 @@ public class PushService(IBus bus) : BackgroundService
             }, new Dictionary<string, string>()
             {
                 [BoteHeaders.TenantId] = "tenant-b",
-                [BoteHeaders.ConnectorId] = "connector-a",
+                [BoteHeaders.ClientId] = "client-a",
             });
             i++;
         }

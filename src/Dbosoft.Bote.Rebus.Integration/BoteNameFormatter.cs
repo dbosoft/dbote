@@ -4,14 +4,14 @@ namespace Dbosoft.Bote.Rebus.Integration;
 
 public class BoteNameFormatter(
     INameFormatter nameFormatter,
-    string connectorsQueue)
+    string clientsQueue)
     : INameFormatter
 {
     public string FormatQueueName(string queueName)
     {
         var formattedName = nameFormatter.FormatQueueName(queueName);
-        return formattedName.StartsWith($"{connectorsQueue}-")
-            ? connectorsQueue
+        return formattedName.StartsWith($"{clientsQueue}-")
+            ? clientsQueue
             : formattedName;
     }
 

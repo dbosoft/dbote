@@ -17,7 +17,7 @@ services:
       "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
       "AzureWebJobsSecretStorageType": memory
 
-  connector-init:
+  client-init:
     build:
       context: ../../dev/management
     restart: "no"
@@ -25,8 +25,8 @@ services:
       basicidentityprovider:
         condition: service_healthy
     configs:
-      - source: connectors
-        target: /import/connectors.json
+      - source: clients
+        target: /import/clients.json
 
   cloud:
     depends_on:
@@ -37,9 +37,11 @@ services:
     environment:
       "dbote__Cloud__Servicebus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
       "dbote__Cloud__ServiceBus__Queues__Cloud": "bote-sample-chat-cloud"
-      "dbote__Cloud__ServiceBus__Queues__Connectors": "bote-sample-chat-connectors"
+      "dbote__Cloud__ServiceBus__Queues__CloudIncoming": "bote-sample-chat-cloud-incoming"
+      "dbote__Cloud__ServiceBus__Queues__Clients": "bote-sample-chat-clients"
       "dbote__Cloud__ServiceBus__Queues__Error": "bote-sample-chat-error"
       "dbote__Cloud__ServiceBus__Queues__Events": "bote-sample-chat-events"
+      "dbote__Cloud__Storage__Connection": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
 
   dbote-worker:
     build:
@@ -47,7 +49,7 @@ services:
     depends_on:
       servicebus-health:
         condition: service_healthy
-      connector-init:
+      client-init:
         condition: service_completed_successfully
       storage-init:
         condition: service_completed_successfully
@@ -68,7 +70,8 @@ services:
       "dbote__Worker__Storage__Prefix": "bote-sample-chat"
       "dbote__Worker__ServiceBus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
       "dbote__Worker__ServiceBus__Queues__Cloud": "bote-sample-chat-cloud"
-      "dbote__Worker__ServiceBus__Queues__Connectors": "bote-sample-chat-connectors"
+      "dbote__Worker__ServiceBus__Queues__CloudIncoming": "bote-sample-chat-cloud-incoming"
+      "dbote__Worker__ServiceBus__Queues__Clients": "bote-sample-chat-clients"
       "dbote__Worker__ServiceBus__Queues__Error": "bote-sample-chat-error"
       "dbote__Worker__ServiceBus__Queues__Events": "bote-sample-chat-events"
       "dbote__Worker__SignalR__Connection": "Endpoint=http://signalr;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;"
@@ -77,68 +80,67 @@ services:
       "dbote__Worker__OpenId__Audience": "http://dbote-worker/api"
       "dbote__Worker__OpenId__RequiredScope": "bote"
 
-  # Tenant A - Connector A (Browser: http://localhost:5000)
-  tenant-a-connector-a:
+  # Tenant A - Client A (Browser: http://localhost:5000)
+  tenant-a-client-a:
     depends_on:
       dbote-worker:
         condition: service_healthy
     build:
-      context: ./Dbosoft.Bote.Samples.Chat.Connector
+      context: ./Dbosoft.Bote.Samples.Chat.Client
     ports:
       - "5000:8080"
     environment:
-      "dbote__Connector__Endpoint": "http://dbote-worker/api"
-      "dbote__Connector__ConnectorId": "connector-a"
-      "dbote__Connector__TenantId": "tenant-a"
-      "dbote__Connector__Authentication__Authority": "http://basicidentityprovider"
-      "dbote__Connector__Authentication__TokenEndpoint": "http://basicidentityprovider/api/tenant-a/token"
-      "dbote__Connector__Authentication__Scope": "bote"
-      "dbote__Connector__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGZfhjhITuJz0BkkS3yYezLelZOm1Lhma4/owsRcj6kuhRANCAAQNJ+AiJ4ZpVMXtEtGijQcf/FSODdPyMevVGTF5EGrDLuUAYEbpjg+eWRrSqpUBGvHdNW4weGZFJCe7Up8WAqe4"
-      "dbote__Connector__Queues__Cloud": "bote-sample-chat-cloud"
-      "dbote__Connector__Queues__Connectors": "bote-sample-chat-connectors"
-      "dbote__Connector__Queues__Error": "bote-sample-chat-error"
+      "dbote__Client__Endpoint": "http://dbote-worker/api"
+      "dbote__Client__ClientId": "client-a"
+      "dbote__Client__TenantId": "tenant-a"
+      "dbote__Client__Queues__Cloud": "bote-sample-chat-cloud"
+      "dbote__Client__Queues__Clients": "bote-sample-chat-clients"
+      "dbote__Client__Queues__Error": "bote-sample-chat-error"      
+      "dbote__Client__Authentication__Authority": "http://basicidentityprovider"
+      "dbote__Client__Authentication__TokenEndpoint": "http://basicidentityprovider/api/tenant-a/token"
+      "dbote__Client__Authentication__Scope": "bote"
+      "dbote__Client__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGZfhjhITuJz0BkkS3yYezLelZOm1Lhma4/owsRcj6kuhRANCAAQNJ+AiJ4ZpVMXtEtGijQcf/FSODdPyMevVGTF5EGrDLuUAYEbpjg+eWRrSqpUBGvHdNW4weGZFJCe7Up8WAqe4"
 
-  # Tenant A - Connector B (Browser: http://localhost:5001)
-  tenant-a-connector-b:
+  # Tenant A - Client B (Browser: http://localhost:5001)
+  tenant-a-client-b:
     depends_on:
       dbote-worker:
         condition: service_healthy
     build:
-      context: ./Dbosoft.Bote.Samples.Chat.Connector
+      context: ./Dbosoft.Bote.Samples.Chat.Client
     ports:
       - "5001:8080"
     environment:
-      "dbote__Connector__Endpoint": "http://dbote-worker/api"
-      "dbote__Connector__ConnectorId": "connector-b"
-      "dbote__Connector__TenantId": "tenant-a"
-      "dbote__Connector__Authentication__Authority": "http://basicidentityprovider"
-      "dbote__Connector__Authentication__TokenEndpoint": "http://basicidentityprovider/api/tenant-a/token"
-      "dbote__Connector__Authentication__Scope": "bote"
-      "dbote__Connector__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwER5qy7vlJWRS8mYGVq9Xs1SiCsFEnAMZTkteXuRZyOhRANCAAQvfIiC9wb0LKvO/UpTSmv9HGt/g3rgwQONgtd4hi6mcVd9uECctHJvpIY0uWdKb1gTwchHUlB2Ll9jnuZL74+Q"
-      "dbote__Connector__Queues__Cloud": "bote-sample-chat-cloud"
-      "dbote__Connector__Queues__Connectors": "bote-sample-chat-connectors"
-      "dbote__Connector__Queues__Error": "bote-sample-chat-error"
-
-  # Tenant B - Connector A (Browser: http://localhost:5002)
-  tenant-b-connector-a:
+      "dbote__Client__Endpoint": "http://dbote-worker/api"
+      "dbote__Client__ClientId": "client-b"
+      "dbote__Client__TenantId": "tenant-a"
+      "dbote__Client__Queues__Cloud": "bote-sample-chat-cloud"
+      "dbote__Client__Queues__Clients": "bote-sample-chat-clients"
+      "dbote__Client__Queues__Error": "bote-sample-chat-error"
+      "dbote__Client__Authentication__Authority": "http://basicidentityprovider"
+      "dbote__Client__Authentication__TokenEndpoint": "http://basicidentityprovider/api/tenant-a/token"
+      "dbote__Client__Authentication__Scope": "bote"
+      "dbote__Client__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwER5qy7vlJWRS8mYGVq9Xs1SiCsFEnAMZTkteXuRZyOhRANCAAQvfIiC9wb0LKvO/UpTSmv9HGt/g3rgwQONgtd4hi6mcVd9uECctHJvpIY0uWdKb1gTwchHUlB2Ll9jnuZL74+Q"
+  # Tenant B - Client A (Browser: http://localhost:5002)
+  tenant-b-client-a:
     depends_on:
       dbote-worker:
         condition: service_healthy
     build:
-      context: ./Dbosoft.Bote.Samples.Chat.Connector
+      context: ./Dbosoft.Bote.Samples.Chat.Client
     ports:
       - "5002:8080"
     environment:
-      "dbote__Connector__Endpoint": "http://dbote-worker/api"
-      "dbote__Connector__ConnectorId": "connector-a"
-      "dbote__Connector__TenantId": "tenant-b"
-      "dbote__Connector__Authentication__Authority": "http://basicidentityprovider"
-      "dbote__Connector__Authentication__TokenEndpoint": "http://basicidentityprovider/api/tenant-b/token"
-      "dbote__Connector__Authentication__Scope": "bote"
-      "dbote__Connector__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgBhzsfVnKvBZjbyYxwXIIwgWqTXci9I+VIHSkO7xG7zChRANCAARy7cvTpFvs6gzm9rqj6o0+0fqoI24ahQBZOmRhQCNkLPNbzM5BJegdjlSTo4b35bl/UlU61T9IoSCBK/lBBPH0"
-      "dbote__Connector__Queues__Cloud": "bote-sample-chat-cloud"
-      "dbote__Connector__Queues__Connectors": "bote-sample-chat-connectors"
-      "dbote__Connector__Queues__Error": "bote-sample-chat-error"
+      "dbote__Client__Endpoint": "http://dbote-worker/api"
+      "dbote__Client__ClientId": "client-a"
+      "dbote__Client__TenantId": "tenant-b"
+      "dbote__Client__Queues__Cloud": "bote-sample-chat-cloud"
+      "dbote__Client__Queues__Clients": "bote-sample-chat-clients"
+      "dbote__Client__Queues__Error": "bote-sample-chat-error"
+      "dbote__Client__Authentication__Authority": "http://basicidentityprovider"
+      "dbote__Client__Authentication__TokenEndpoint": "http://basicidentityprovider/api/tenant-b/token"
+      "dbote__Client__Authentication__Scope": "bote"
+      "dbote__Client__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgBhzsfVnKvBZjbyYxwXIIwgWqTXci9I+VIHSkO7xG7zChRANCAARy7cvTpFvs6gzm9rqj6o0+0fqoI24ahQBZOmRhQCNkLPNbzM5BJegdjlSTo4b35bl/UlU61T9IoSCBK/lBBPH0"
 
 configs:
   azfunctions-secrets:
