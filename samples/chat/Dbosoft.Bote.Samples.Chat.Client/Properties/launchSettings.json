@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Tenant A - Client A": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "dbote__Client__Endpoint": "http://localhost:7249/api",
+        "dbote__Client__ClientId": "client-a",
+        "dbote__Client__TenantId": "tenant-a",
+        "dbote__Client__Authentication__Authority": "http://basicidentityprovider",
+        "dbote__Client__Authentication__TokenEndpoint": "http://localhost:7250/api/tenant-a/token",
+        "dbote__Client__Authentication__Scope": "bote",
+        "dbote__Client__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGZfhjhITuJz0BkkS3yYezLelZOm1Lhma4/owsRcj6kuhRANCAAQNJ+AiJ4ZpVMXtEtGijQcf/FSODdPyMevVGTF5EGrDLuUAYEbpjg+eWRrSqpUBGvHdNW4weGZFJCe7Up8WAqe4",
+        "dbote__Client__Queues__Cloud": "bote-sample-chat-cloud",
+        "dbote__Client__Queues__Clients": "bote-sample-chat-clients",
+        "dbote__Client__Queues__Error": "bote-sample-chat-error"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:5000"
+    },
+    "Tenant A - Client B": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "dbote__Client__Endpoint": "http://localhost:7249/api",
+        "dbote__Client__ClientId": "client-b",
+        "dbote__Client__TenantId": "tenant-a",
+        "dbote__Client__Authentication__Authority": "http://basicidentityprovider",
+        "dbote__Client__Authentication__TokenEndpoint": "http://localhost:7250/api/tenant-a/token",
+        "dbote__Client__Authentication__Scope": "bote",
+        "dbote__Client__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwER5qy7vlJWRS8mYGVq9Xs1SiCsFEnAMZTkteXuRZyOhRANCAAQvfIiC9wb0LKvO/UpTSmv9HGt/g3rgwQONgtd4hi6mcVd9uECctHJvpIY0uWdKb1gTwchHUlB2Ll9jnuZL74+Q",
+        "dbote__Client__Queues__Cloud": "bote-sample-chat-cloud",
+        "dbote__Client__Queues__Clients": "bote-sample-chat-clients",
+        "dbote__Client__Queues__Error": "bote-sample-chat-error"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:5001"
+    },
+    "Tenant B - Client A": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "dbote__Client__Endpoint": "http://localhost:7249/api",
+        "dbote__Client__ClientId": "client-a",
+        "dbote__Client__TenantId": "tenant-b",
+        "dbote__Client__Authentication__Authority": "http://basicidentityprovider",
+        "dbote__Client__Authentication__TokenEndpoint": "http://localhost:7250/api/tenant-b/token",
+        "dbote__Client__Authentication__Scope": "bote",
+        "dbote__Client__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgBhzsfVnKvBZjbyYxwXIIwgWqTXci9I+VIHSkO7xG7zChRANCAARy7cvTpFvs6gzm9rqj6o0+0fqoI24ahQBZOmRhQCNkLPNbzM5BJegdjlSTo4b35bl/UlU61T9IoSCBK/lBBPH0",
+        "dbote__Client__Queues__Cloud": "bote-sample-chat-cloud",
+        "dbote__Client__Queues__Clients": "bote-sample-chat-clients",
+        "dbote__Client__Queues__Error": "bote-sample-chat-error"
+      },
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:5002"
+    }
+  }
+}

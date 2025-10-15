@@ -1,0 +1,171 @@
+﻿@page "/"
+@implements IAsyncDisposable
+@using Dbosoft.Bote.Primitives
+@using Dbosoft.Bote.Samples.Chat.Client.Services
+@using Dbosoft.Bote.Samples.Chat.Messages
+@using global::Rebus.Bus
+@rendermode InteractiveServer
+@inject IChatService ChatService
+@inject IBus Bus
+@inject IJSRuntime JS
+@inject IFileStorageService FileStorage
+
+<PageTitle>Chat</PageTitle>
+
+<div class="chatlog" @ref="_chatLog">
+    @foreach (var item in _chatItems)
+    {
+        @if (item is ChatResponse chatMessage)
+        {
+            <div>
+                <span>@chatMessage.Author</span>: <span>@chatMessage.Message</span>
+            </div>
+        }
+        else if (item is FileShareMessage fileMessage)
+        {
+            <div>
+                <span>@fileMessage.Author</span> shared file:
+                <a href="/download/@fileMessage.Id" download="@fileMessage.FileName">
+                    <strong>@fileMessage.FileName</strong>
+                </a>
+            </div>
+        }
+    }
+</div>
+
+<div class="chatinput">
+    <input type="text" class="chatmessage" @bind="TextInput" @onkeyup="OnKeyUp" />
+    <button class="btn btn-primary" @onclick="SendMessage">Send</button>
+    <br/>
+    <InputFile OnChange="OnFileSelected" />
+    <button class="btn btn-secondary" @onclick="SendFile" disabled="@(_selectedFile == null)">Send File</button>
+</div>
+
+ <script src="Components/Pages/Home.razor.js"></script>
+@code {
+
+    private readonly List<object> _chatItems = new();
+    private string? TextInput { get; set; }
+    private IBrowserFile? _selectedFile;
+
+    private IJSObjectReference? _module;
+    private ElementReference _chatLog;
+
+    protected override void OnInitialized()
+    {
+        ChatService.OnMessageReceived += OnMessageReceived;
+        ChatService.OnFileReceived += OnFileReceived;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        _module = await JS.InvokeAsync<IJSObjectReference>(
+            "import",
+            "./Components/Pages/Home.razor.js");
+    }
+
+    private async Task OnMessageReceived(ChatResponse chatMessage)
+    {
+        _chatItems.Add(chatMessage);
+        await InvokeAsync(StateHasChanged);
+        if (_module is null)
+            return;
+        await _module.InvokeVoidAsync("scrollToEnd", _chatLog);
+    }
+
+    private async Task OnFileReceived(FileShareMessage fileMessage)
+    {
+        _chatItems.Add(fileMessage);
+        await InvokeAsync(StateHasChanged);
+        if (_module is null)
+            return;
+        await _module.InvokeVoidAsync("scrollToEnd", _chatLog);
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+    }
+
+    private async Task SendFile()
+    {
+        if (_selectedFile == null)
+            return;
+
+        // Allow files up to 500MB (since DataBus uses blob storage, not SignalR messages)
+        using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 500 * 1024 * 1024);
+        var attachment = await Bus.Advanced.DataBus.CreateAttachment(stream);
+
+        var fileId = Guid.NewGuid();
+
+        // Manually add Bote DataBus header for testing (will be automatic later)
+        await Bus.Send(new FileShareRequest
+        {
+            Id = fileId,
+            FileName = _selectedFile.Name,
+            FileData = attachment
+        }, new Dictionary<string, string>
+        {
+            [BoteHeaders.AttachmentId] = attachment.Id
+        });
+
+        // Store the file locally for download
+        FileStorage.StoreFile(fileId.ToString(), attachment, _selectedFile.Name);
+
+        _chatItems.Add(new FileShareMessage
+        {
+            Id = fileId,
+            Author = "Me",
+            FileName = _selectedFile.Name,
+            FileData = attachment
+        });
+
+        _selectedFile = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrEmpty(TextInput))
+            return;
+
+        var message = TextInput;
+        TextInput = "";
+
+        await Bus.Send(new ChatRequest
+        {
+            Id = Guid.NewGuid(),
+            Message = message,
+        });
+
+        _chatItems.Add(new ChatResponse
+        {
+            Id = Guid.NewGuid(),
+            Author = "Me",
+            Message = message,
+        });
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        ChatService.OnMessageReceived -= OnMessageReceived;
+        ChatService.OnFileReceived -= OnFileReceived;
+        if (_module is null)
+            return;
+
+        await _module.DisposeAsync();
+    }
+}

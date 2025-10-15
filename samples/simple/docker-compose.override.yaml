@@ -1,0 +1,114 @@
+services:
+  client-init:
+    environment:
+      "IdentityProviderUrl": "http://basicidentityprovider"
+
+configs:
+  clients:
+    content: |
+      [
+        {
+          "TenantId": "tenant-a",
+          "ClientId": "client-a",
+          "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDSfgIieGaVTF7RLRoo0HH/xUjg3T8jHr1RkxeRBqwy7lAGBG6Y4Pnlka0qqVARrx3TVuMHhmRSQnu1KfFgKnuA=="
+        }
+        ,
+        {
+          "TenantId": "tenant-a",
+          "ClientId": "client-b",
+          "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEL3yIgvcG9Cyrzv1KU0pr/Rxrf4N64MEDjYLXeIYupnFXfbhAnLRyb6SGNLlnSm9YE8HIR1JQdi5fY57mS++PkA=="
+        },
+        {
+          "TenantId": "tenant-b",
+          "ClientId": "client-a",
+          "PublicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcu3L06Rb7OoM5va6o+qNPtH6qCNuGoUAWTpkYUAjZCzzW8zOQSXoHY5Uk6OG9+W5f1JVOtU/SKEggSv5QQTx9A=="
+        }
+      ]
+  servicebus:
+    content: |
+      {
+        "UserConfig": {
+          "Namespaces": [
+            {
+              "Name": "sbemulatorns",
+              "Queues": [
+                {
+                  "Name": "bote-sample-simple-cloud",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "bote-sample-simple-error",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "bote-sample-simple-clients",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "bote-sample-simple-events",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                }
+              ],
+            }
+          ],
+          "Logging": {
+            "Type": "File"
+          }
+        }
+      }
+  signalr:
+    content: |
+      {
+        "UpstreamSettings":
+        {
+          "Templates":
+          [
+            {
+              "UrlTemplate": "http://dbote-worker/runtime/webhooks/signalr?code=master-secret",
+              "EventPattern": "*",
+              "HubPattern": "*",
+              "CategoryPattern": "*"
+            }
+          ]
+        }
+      }

@@ -1,0 +1,155 @@
+include:
+  - ../../docker-compose.yaml
+
+services:
+  basicidentityprovider:
+    build:
+      context: ../../src/workers/src/Dbosoft.Bote.BasicIdentityProvider
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/api/.well-known/jwks.json"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    environment:
+      "BasicIdentityProvider__Authority": "http://basicidentityprovider"
+      "BasicIdentityProvider__Audience": "http://dbote-worker/api"
+      "AzureWebJobsStorage": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+      "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
+      "AzureWebJobsSecretStorageType": memory
+
+  client-init:
+    build:
+      context: ../../dev/management
+    restart: "no"
+    depends_on:
+      basicidentityprovider:
+        condition: service_healthy
+    configs:
+      - source: clients
+        target: /import/clients.json
+
+  cloud:
+    depends_on:
+      dbote-worker:
+        condition: service_healthy
+    build:
+      context: ./Dbosoft.Bote.Samples.Simple.Cloud
+    environment:
+      "dbote__Cloud__Servicebus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+      "dbote__Cloud__ServiceBus__Queues__Cloud": "bote-sample-simple-cloud"
+      "dbote__Cloud__ServiceBus__Queues__Clients": "bote-sample-simple-clients"
+      "dbote__Cloud__ServiceBus__Queues__Error": "bote-sample-simple-error"
+      "dbote__Cloud__ServiceBus__Queues__Events": "bote-sample-simple-events"
+
+  dbote-worker:
+    build:
+      context: ../../src/workers/src/Dbosoft.Bote.BoteWorker
+    depends_on:
+      servicebus-health:
+        condition: service_healthy
+      client-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/admin/host/status?code=master-secret"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    configs:
+      - source: azfunctions-secrets
+        target: /azure-functions-host/Secrets/host.json
+    environment:
+      # Use the full Azurite connection string as we need to change the host
+      "AzureWebJobsStorage": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+      "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
+      "AzureWebJobsSecretStorageType": files
+      "dbote__Worker__Storage__Connection": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+      "dbote__Worker__Storage__Prefix": "bote-sample-simple"
+      "dbote__Worker__ServiceBus__Connection": "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+      "dbote__Worker__ServiceBus__Queues__Cloud": "bote-sample-simple-cloud"
+      "dbote__Worker__ServiceBus__Queues__Clients": "bote-sample-simple-clients"
+      "dbote__Worker__ServiceBus__Queues__Error": "bote-sample-simple-error"
+      "dbote__Worker__ServiceBus__Queues__Events": "bote-sample-simple-events"
+      "dbote__Worker__SignalR__Connection": "Endpoint=http://signalr;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;"
+      "dbote__Worker__OpenId__Authority": "http://basicidentityprovider"
+      "dbote__Worker__OpenId__JwksUri": "http://basicidentityprovider/api/.well-known/jwks.json"
+      "dbote__Worker__OpenId__Audience": "http://dbote-worker/api"
+      "dbote__Worker__OpenId__RequiredScope": "bote"
+
+  tenant-a-client-a:
+    depends_on:
+      dbote-worker:
+        condition: service_healthy
+    build:
+      context: ./Dbosoft.Bote.Samples.Simple.Client
+    environment:
+      "dbote__Client__Endpoint": "http://dbote-worker/api"
+      "dbote__Client__ClientId": "client-a"
+      "dbote__Client__TenantId": "tenant-a"
+      "dbote__Client__Authentication__Authority": "http://basicidentityprovider"
+      "dbote__Client__Authentication__TokenEndpoint": "http://basicidentityprovider/api/tenant-a/token"
+      "dbote__Client__Authentication__Scope": "bote"
+      "dbote__Client__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgGZfhjhITuJz0BkkS3yYezLelZOm1Lhma4/owsRcj6kuhRANCAAQNJ+AiJ4ZpVMXtEtGijQcf/FSODdPyMevVGTF5EGrDLuUAYEbpjg+eWRrSqpUBGvHdNW4weGZFJCe7Up8WAqe4"
+      "dbote__Client__Queues__Cloud": "bote-sample-simple-cloud"
+      "dbote__Client__Queues__Clients": "bote-sample-simple-clients"
+      "dbote__Client__Queues__Error": "bote-sample-simple-error"
+
+  tenant-a-client-b:
+    depends_on:
+      dbote-worker:
+        condition: service_healthy
+    build:
+      context: ./Dbosoft.Bote.Samples.Simple.Client
+    environment:
+      "dbote__Client__Endpoint": "http://dbote-worker/api"
+      "dbote__Client__ClientId": "client-b"
+      "dbote__Client__TenantId": "tenant-a"
+      "dbote__Client__Authentication__Authority": "http://basicidentityprovider"
+      "dbote__Client__Authentication__TokenEndpoint": "http://basicidentityprovider/api/tenant-a/token"
+      "dbote__Client__Authentication__Scope": "bote"
+      "dbote__Client__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwER5qy7vlJWRS8mYGVq9Xs1SiCsFEnAMZTkteXuRZyOhRANCAAQvfIiC9wb0LKvO/UpTSmv9HGt/g3rgwQONgtd4hi6mcVd9uECctHJvpIY0uWdKb1gTwchHUlB2Ll9jnuZL74+Q"
+      "dbote__Client__Queues__Cloud": "bote-sample-simple-cloud"
+      "dbote__Client__Queues__Clients": "bote-sample-simple-clients"
+      "dbote__Client__Queues__Error": "bote-sample-simple-error"
+
+  tenant-b-client-a:
+    depends_on:
+      dbote-worker:
+        condition: service_healthy
+    build:
+      context: ./Dbosoft.Bote.Samples.Simple.Client
+    environment:
+      "dbote__Client__Endpoint": "http://dbote-worker/api"
+      "dbote__Client__ClientId": "client-a"
+      "dbote__Client__TenantId": "tenant-b"
+      "dbote__Client__Authentication__Authority": "http://basicidentityprovider"
+      "dbote__Client__Authentication__TokenEndpoint": "http://basicidentityprovider/api/tenant-b/token"
+      "dbote__Client__Authentication__Scope": "bote"
+      "dbote__Client__Authentication__SigningKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgBhzsfVnKvBZjbyYxwXIIwgWqTXci9I+VIHSkO7xG7zChRANCAARy7cvTpFvs6gzm9rqj6o0+0fqoI24ahQBZOmRhQCNkLPNbzM5BJegdjlSTo4b35bl/UlU61T9IoSCBK/lBBPH0"
+      "dbote__Client__Queues__Cloud": "bote-sample-simple-cloud"
+      "dbote__Client__Queues__Clients": "bote-sample-simple-clients"
+      "dbote__Client__Queues__Error": "bote-sample-simple-error"
+
+configs:
+  azfunctions-secrets:
+    content: |
+      {
+        "masterKey": {
+          "name": "master",
+          "value": "master-secret",
+          "encrypted": false
+        },
+        "functionKeys": [
+          {
+            "name": "default",
+            "value": "default-secret",
+            "encrypted": false
+          }
+        ],
+        "systemKeys": [
+          {
+            "name": "signalr_extension",
+            "value": "signalr-secret",
+            "encrypted": false
+          }
+        ],
+      }
