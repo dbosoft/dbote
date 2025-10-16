@@ -24,7 +24,7 @@ public abstract class WorkloadBase(BenchmarkType benchmarkType, IBus bus) : Work
             },
             new Dictionary<string, string>()
             {
-                ["bote-tenant-id"] = "tenant-a",
+                ["dbote-tenant-id"] = "tenant-a",
             },
             TimeSpan.FromMinutes(1));
     }

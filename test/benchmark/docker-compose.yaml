@@ -81,6 +81,17 @@ services:
       "dbote__Client__Queues__Clients": "bote-benchmark-clients"
       "dbote__Client__Queues__Error": "bote-benchmark-error"
 
+  client-init:
+    build:
+      context: ../../dev/management
+    restart: "no"
+    depends_on:
+      basicidentityprovider:
+        condition: service_healthy
+    configs:
+      - source: clients
+        target: /import/clients.json
+
   service:
     depends_on:
       dbote-worker:

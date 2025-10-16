@@ -14,6 +14,11 @@ Push-Location ./Dbosoft.Bote.Benchmark.Client
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
+Push-Location ../../src/workers/src/Dbosoft.Bote.BasicIdentityProvider
+Write-Host "Publishing BasicIdentityProvider..." -ForegroundColor Yellow
+dotnet publish -c Release -r linux-x64
+Pop-Location
+
 Push-Location ./Dbosoft.Bote.Benchmark.Service
 dotnet publish -c Release -r linux-x64
 Pop-Location
