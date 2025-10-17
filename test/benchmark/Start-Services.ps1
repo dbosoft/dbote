@@ -15,7 +15,6 @@ dotnet publish -c Release -r linux-x64
 Pop-Location
 
 Push-Location ../../src/workers/src/Dbosoft.Bote.BasicIdentityProvider
-Write-Host "Publishing BasicIdentityProvider..." -ForegroundColor Yellow
 dotnet publish -c Release -r linux-x64
 Pop-Location
 
