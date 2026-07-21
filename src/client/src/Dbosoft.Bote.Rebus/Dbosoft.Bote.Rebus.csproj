@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Dbosoft.Bote.Rebus.Tests" />
+    <InternalsVisibleTo Include="Dbosoft.Bote.Rebus.IntegrationTests" />
   </ItemGroup>
 
   <ItemGroup>
