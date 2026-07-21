@@ -65,6 +65,9 @@ public static class BoteConfigurationExtensions
         if (string.IsNullOrWhiteSpace(outboxContainerName))
             outboxContainerName = BoteStorageConstants.Outbox;
 
+        // The storage endpoint we trust the inbox SAS to point at (SSRF guard in the step).
+        var trustedStorageEndpoint = new BlobServiceClient(connectionString).Uri;
+
         // Register DataBusIncomingStep to import attachments from cloud inbox
         // Flow: Client uploads to client-outbox → BoteWorker copies to cloud-inbox → Cloud reads from cloud-inbox
         configurer.Decorate<IPipeline>(context =>
@@ -74,7 +77,7 @@ public static class BoteConfigurationExtensions
             var loggerFactory = context.Get<IRebusLoggerFactory>();
 
             return new PipelineStepConcatenator(pipeline)
-                .OnReceive(new DataBusIncomingStep(dataBusStorage, loggerFactory), 
+                .OnReceive(new DataBusIncomingStep(dataBusStorage, loggerFactory, trustedStorageEndpoint),
                     PipelineAbsolutePosition.Front);
         });
         

@@ -106,19 +106,21 @@ public class DataBusCopyProcessor(
 
         logger.LogInformation("starting copy for attachment {AttachmentId}: {Source} to {Destination}",
             request.AttachmentId, sourceBlob.Name, destBlob.Name);
+        // Idempotency (H4b): the blob trigger is at-least-once and the inline/monitor paths can
+        // re-run. A re-delivered request usually finds the destination already present above and
+        // returns completed without re-copying. For a truly concurrent duplicate that both pass
+        // the exists-check, Azure Storage returns 409 on the second Copy Blob because the
+        // destination already has a pending copy - treat that as "the copy is already running"
+        // and fall through to monitoring it. (A prior IfNoneMatch=* destination condition was
+        // dropped because the Azure Storage Emulator returns 500 for a conditional copy, which
+        // broke the DataBus flow on the local stack; the copy itself is unconditional.)
         try
         {
-            // Idempotency guard: the blob trigger is at-least-once and the inline path and the
-            // monitor queue can race. IfNoneMatch=* lets only the first copy win; a concurrent
-            // duplicate gets 409 and just falls through to monitoring the copy already running.
-            await destBlob.StartCopyFromUriAsync(request.SourceBlobUri, new BlobCopyFromUriOptions
-            {
-                DestinationConditions = new BlobRequestConditions { IfNoneMatch = ETag.All }
-            });
+            await destBlob.StartCopyFromUriAsync(request.SourceBlobUri);
         }
         catch (RequestFailedException ex) when (ex.Status == 409)
         {
-            logger.LogInformation("Copy already started for attachment {AttachmentId}; monitoring existing copy",
+            logger.LogInformation("Copy already in progress for attachment {AttachmentId}; monitoring it",
                 request.AttachmentId);
         }
         request.MonitorCount = 0; // Reset for copy monitoring phase

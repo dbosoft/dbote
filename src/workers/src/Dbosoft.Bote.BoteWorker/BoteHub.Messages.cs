@@ -54,19 +54,16 @@ internal partial class BoteHub
             throw new UnauthorizedAccessException($"Queue '{queue}' is not allowed");
         }
 
-        // Validate headers - REJECT if client attempts to inject security-critical headers
-        var blockedHeaders = new[]
+        // Validate headers against the trust-boundary allow-list - REJECT if the client
+        // tries to set any worker-controlled dbote-* header (identity, routing, inbox SAS,
+        // retry tracking). Only dbote-attachment-id and non-dbote headers are permitted.
+        var disallowedHeaders = BoteHeaderPolicy.DisallowedClientHeaders(message.Headers.Keys);
+        if (disallowedHeaders.Count > 0)
         {
-            BoteHeaders.TenantId,
-            BoteHeaders.ClientId
-        };
-
-        foreach (var blockedHeader in blockedHeaders)
-        {
-            if (!message.Headers.ContainsKey(blockedHeader)) continue;
-            logger.LogError("Client {TenantId}-{ClientId} attempted to inject blocked header: {Header}",
-                tenantId, clientId, blockedHeader);
-            throw new UnauthorizedAccessException($"Attempted to inject blocked header: {blockedHeader}");
+            logger.LogError("Client {TenantId}-{ClientId} attempted to set disallowed header(s): {Headers}",
+                tenantId, clientId, string.Join(", ", disallowedHeaders));
+            throw new UnauthorizedAccessException(
+                $"Attempted to set disallowed header(s): {string.Join(", ", disallowedHeaders)}");
         }
 
         var serviceBusMessage = messageConverter.ToServiceBus(message);
@@ -281,9 +278,13 @@ internal partial class BoteHub
     {
         var blobPath = $"{tenantId}/{attachmentId}";
         var blobClient = container.GetBlobClient(blobPath);
+        // Short-lived: this SAS travels inside the message (ASB application property) and would
+        // otherwise sit in the DLQ / telemetry as a long-lived delete capability. It is minted
+        // only once the attachment is Ready and is consumed by the cloud's DataBusIncomingStep
+        // shortly after; two hours is generous headroom. The H4c TTL policy reaps the blob.
         var sasUri = blobClient.GenerateSasUri(
             BlobSasPermissions.Read | BlobSasPermissions.Delete,
-            DateTimeOffset.UtcNow.AddDays(30));
+            DateTimeOffset.UtcNow.AddHours(2));
         return sasUri;
     }
 

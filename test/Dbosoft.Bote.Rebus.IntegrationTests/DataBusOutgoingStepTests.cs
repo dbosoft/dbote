@@ -17,7 +17,8 @@ namespace Dbosoft.Bote.Rebus.IntegrationTests;
 /// outbox synchronously and fail the send if that upload fails - never let the message
 /// (which references the attachment) be sent while the attachment is missing.
 /// </summary>
-public class DataBusOutgoingStepTests : IClassFixture<AzuriteFixture>
+[Collection(AzuriteCollection.Name)]
+public class DataBusOutgoingStepTests
 {
     private const string OutboxContainer = "test-outbox";
     private readonly AzuriteFixture _azurite;

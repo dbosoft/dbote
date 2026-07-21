@@ -27,3 +27,14 @@ public sealed class AzuriteFixture : IAsyncLifetime
 
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();
 }
+
+/// <summary>
+/// Shares a single Azurite container across all storage-backed test classes, so they don't
+/// each spin up their own container and race on startup (which was flaky under xunit's
+/// parallel class execution). Classes in this collection run sequentially.
+/// </summary>
+[CollectionDefinition(Name)]
+public sealed class AzuriteCollection : ICollectionFixture<AzuriteFixture>
+{
+    public const string Name = "Azurite";
+}

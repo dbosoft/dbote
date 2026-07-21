@@ -10,7 +10,8 @@ namespace Dbosoft.Bote.Rebus.Integration.Pipeline;
 [StepDocumentation("Imports DataBus attachments from clients via SAS URL to cloud's IDataBusStorage")]
 internal class DataBusIncomingStep(
     IDataBusStorage dataBusStorage,
-    IRebusLoggerFactory loggerFactory)
+    IRebusLoggerFactory loggerFactory,
+    Uri trustedStorageEndpoint)
     : IIncomingStep
 {
     private readonly ILog _logger = loggerFactory.GetLogger<DataBusIncomingStep>();
@@ -38,8 +39,19 @@ internal class DataBusIncomingStep(
         _logger.Info("Importing attachment {AttachmentId} from cloud inbox for tenant {TenantId}",
             attachmentId, tenantId);
 
+        var sasUri = new Uri(sasUrl);
+
+        // SSRF guard: only fetch from our own storage endpoint, never an arbitrary host.
+        if (!DataBusSasUriValidator.IsTrustedEndpoint(sasUri, trustedStorageEndpoint))
+        {
+            _logger.Error("Refusing to import attachment {AttachmentId}: inbox SAS host {Host} is not the trusted storage endpoint",
+                attachmentId, sasUri.Host);
+            throw new InvalidOperationException(
+                $"DataBus inbox SAS points at an untrusted host: {sasUri.Host}");
+        }
+
         // Download from SAS URL (storage-agnostic!)
-        var blobClient = new BlobClient(new Uri(sasUrl));
+        var blobClient = new BlobClient(sasUri);
 
         // Get blob properties to read metadata (metadata is already on the blob from DataBusCopyProcessor)
         var sourceProps = await blobClient.GetPropertiesAsync();

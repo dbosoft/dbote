@@ -11,6 +11,7 @@
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" Version="9.0.0" />
     <PackageReference Include="Azure.Storage.Queues" Version="12.22.0" />
+    <PackageReference Include="Microsoft.Extensions.Azure" Version="1.12.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Rebus" Version="8.8.0" />
     <PackageReference Include="Testcontainers.Azurite" Version="4.0.0" />
@@ -24,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\client\src\Dbosoft.Bote.Rebus\Dbosoft.Bote.Rebus.csproj" />
     <ProjectReference Include="..\..\src\Dbosoft.Bote.Rebus.Integration\Dbosoft.Bote.Rebus.Integration.csproj" />
+    <ProjectReference Include="..\..\src\workers\src\Dbosoft.Bote.BoteWorker\Dbosoft.Bote.BoteWorker.csproj" />
   </ItemGroup>
 
   <ItemGroup>

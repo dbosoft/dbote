@@ -117,10 +117,10 @@ namespace Dbosoft.Bote.BoteWorker
                 throw new InvalidOperationException($"Attachment {attachmentId} not found");
             }
 
-            // Generate URI
+            // Generate URI - short-lived; the client fetches this on demand right before reading.
             var uri = blobClient.GenerateBlobSasUri(
                 BlobSasPermissions.Read | BlobSasPermissions.Delete,
-                DateTimeOffset.UtcNow.AddDays(30));
+                DateTimeOffset.UtcNow.AddHours(1));
 
             logger.LogInformation("Issued read URI for tenant {TenantId}, client {ClientId}, attachment {AttachmentId}",
                 tenantId, clientId, attachmentId);

@@ -1,4 +1,5 @@
 ﻿using Azure.Data.Tables;
+using Dbosoft.Bote.Primitives;
 using Dbosoft.Bote.Transport.Abstractions;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
@@ -20,29 +21,31 @@ namespace Dbosoft.Bote.BoteWorker
 
 
             var subscribers = subscriptionsTable.Query<TableEntity>(
-                filter: $"PartitionKey eq '{partitionKey}'");
+                filter: $"PartitionKey eq '{partitionKey}'").ToList();
 
-            var subscriberCount = 0;
-            var staleSubscriptions = new List<string>();
+            // Fan out in parallel with per-subscriber failure isolation: one slow or failing
+            // subscriber must not block the others (head-of-line) or abort the whole broadcast.
+            var result = await BroadcastFanOut.RunAsync(
+                subscribers,
+                subscriber => ForwardToClientQueue(tenantId, subscriber.GetString("ClientId"), boteMessage),
+                maxConcurrency: 16);
 
-            foreach (var subscriber in subscribers)
+            var staleCount = 0;
+            var hardFailures = new List<Exception>();
+
+            foreach (var (subscriber, error) in result.Failures)
             {
                 var clientId = subscriber.GetString("ClientId");
-                try
+                if (error is Azure.RequestFailedException { Status: 404 })
                 {
-                    await ForwardToClientQueue(tenantId, clientId, boteMessage);
-                    subscriberCount++;
-                }
-                catch (Azure.RequestFailedException ex) when (ex.Status == 404)
-                {
+                    // The client queue is gone - the subscription is stale, drop it.
                     logger.LogInformation(
                         "Removing stale subscription for {TenantId}/{ClientId} on topic {Topic} - queue not found",
                         tenantId, clientId, topic);
-
                     try
                     {
                         await subscriptionsTable.DeleteEntityAsync(subscriber.PartitionKey, subscriber.RowKey);
-                        staleSubscriptions.Add(clientId);
+                        staleCount++;
                     }
                     catch (Exception deleteEx)
                     {
@@ -51,11 +54,27 @@ namespace Dbosoft.Bote.BoteWorker
                             tenantId, clientId);
                     }
                 }
+                else
+                {
+                    hardFailures.Add(error);
+                    logger.LogWarning(error,
+                        "Failed to deliver broadcast to {TenantId}/{ClientId} on topic {Topic}",
+                        tenantId, clientId, topic);
+                }
             }
 
             logger.LogInformation(
-                "Broadcast to topic {Topic} in tenant {TenantId} delivered to {SubscriberCount} subscribers, removed {StaleCount} stale subscriptions",
-                topic, tenantId, subscriberCount, staleSubscriptions.Count);
+                "Broadcast to topic {Topic} in tenant {TenantId}: delivered {Delivered}, removed {StaleCount} stale, failed {FailedCount}",
+                topic, tenantId, result.Delivered, staleCount, hardFailures.Count);
+
+            // Only retry the whole message (throw -> Service Bus redelivers) when nobody received
+            // it and there were real failures. On partial success we complete: re-broadcasting to
+            // everyone would duplicate for those already delivered, and broadcast is best-effort to
+            // the currently active subscribers.
+            if (result.Delivered == 0 && hardFailures.Count > 0)
+                throw new AggregateException(
+                    $"Broadcast to topic {topic} for tenant {tenantId} failed for all {hardFailures.Count} subscriber(s)",
+                    hardFailures);
         }
 
 

@@ -3,7 +3,6 @@ using Azure.Storage.Queues;
 using Azure.Storage.Queues.Models;
 using Azure.Storage.Sas;
 using AwesomeAssertions;
-using Dbosoft.Bote.Rebus;
 using Dbosoft.Bote.Rebus.Config;
 using Dbosoft.Bote.Transport.Abstractions;
 using Rebus.Activation;
@@ -27,7 +26,8 @@ namespace Dbosoft.Bote.Rebus.IntegrationTests;
 /// issuance is stood in for by <see cref="StorageQueueSignalRClient"/>, which hands out real
 /// Azurite SAS URIs - that issuance is a thin, separate concern.
 /// </summary>
-public class PoisonRedeliveryEndToEndTests : IClassFixture<AzuriteFixture>
+[Collection(AzuriteCollection.Name)]
+public class PoisonRedeliveryEndToEndTests
 {
     private readonly AzuriteFixture _azurite;
 
