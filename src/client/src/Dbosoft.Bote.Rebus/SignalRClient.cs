@@ -15,6 +15,8 @@ internal interface ISignalRClient
 {
     Task<string> GetQueueConnection();
 
+    Task<string> GetErrorQueueConnection();
+
     Task SendMessage(string queue, BoteMessage message);
 
     Task SubscribeToTopic(string topicName);
@@ -72,6 +74,12 @@ internal class SignalRClient(
     public async Task<string> GetQueueConnection()
     {
         var queueMetadata = await _connection!.InvokeAsync<BoteQueueMetadata>("GetQueueMetadata");
+        return queueMetadata.Connection;
+    }
+
+    public async Task<string> GetErrorQueueConnection()
+    {
+        var queueMetadata = await _connection!.InvokeAsync<BoteQueueMetadata>("GetErrorQueueMetadata");
         return queueMetadata.Connection;
     }
 

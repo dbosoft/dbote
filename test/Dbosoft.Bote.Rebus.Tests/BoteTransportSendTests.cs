@@ -88,6 +88,7 @@ public class BoteTransportSendTests
         }
 
         public Task<string> GetQueueConnection() => throw new NotSupportedException();
+        public Task<string> GetErrorQueueConnection() => throw new NotSupportedException();
         public Task SubscribeToTopic(string topicName) => throw new NotSupportedException();
         public Task UnsubscribeFromTopic(string topicName) => throw new NotSupportedException();
         public Task<string> GetDataBusAttachmentUri(string attachmentId) => throw new NotSupportedException();

@@ -128,6 +128,38 @@ internal partial class BoteHub(
     }
 
 
+    /// <summary>
+    /// Issues a write-only SAS for the client's local dead-letter queue
+    /// (<c>{prefix}-{tenant}-{client}-error</c>). Clients move poison messages here
+    /// directly, so the edge keeps its own failures instead of routing them through
+    /// the <see cref="SendMessage"/> whitelist (which only accepts the cloud/clients
+    /// queues and would reject the error queue).
+    /// </summary>
+    [Function(nameof(GetErrorQueueMetadata))]
+    public async Task<BoteQueueMetadata> GetErrorQueueMetadata(
+        [SignalRTrigger(
+            HubName,
+            "messages",
+            nameof(this.GetErrorQueueMetadata),
+            ConnectionStringSetting = "dbote:Worker:SignalR:Connection")]
+        SignalRInvocationContext invocationContext)
+    {
+        var tenantId = ExtractTenantId(invocationContext);
+        var clientId = ExtractClientId(invocationContext);
+
+        var queueClient = await tenantStorageResolver.ResolveQueueClient(tenantId, $"{clientId}-error");
+        await queueClient.CreateIfNotExistsAsync();
+        var uri = queueClient.GenerateSasUri(
+            QueueSasPermissions.Add,
+            DateTimeOffset.UtcNow.AddHours(1));
+
+        return new BoteQueueMetadata
+        {
+            Connection = uri.ToString(),
+        };
+    }
+
+
     private static string ExtractTenantId(SignalRInvocationContext context)
     {
         if (!context.Claims.TryGetValue(ClaimNames.TenantId, out var tenantId) ||

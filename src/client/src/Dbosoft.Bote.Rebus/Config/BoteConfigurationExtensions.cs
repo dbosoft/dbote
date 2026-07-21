@@ -4,6 +4,7 @@ using Rebus.Config;
 using Rebus.Logging;
 using Rebus.Pipeline;
 using Rebus.Pipeline.Receive;
+using Rebus.Retry;
 using Rebus.Subscriptions;
 using Rebus.Threading;
 using Rebus.Timeouts;
@@ -93,6 +94,17 @@ public static class BoteConfigurationExtensions
             var signalRClient = c.Get<ISignalRClient>();
             return new BoteSubscriptionStorage(signalRClient);
         });
+
+        // Replace Rebus' default deadletter handler: poison messages must not be routed
+        // back through the SignalR SendMessage whitelist (which would reject the error
+        // queue). Instead they are written to the client's local error Storage Queue.
+        configurer.OtherService<IErrorQueueWriter>()
+            .Register(c => new BoteErrorQueueWriter(c.Get<ISignalRClient>()));
+
+        configurer.OtherService<IErrorHandler>()
+            .Register(c => new BoteErrorHandler(
+                c.Get<IErrorQueueWriter>(),
+                c.Get<IRebusLoggerFactory>()));
 
         configurer.Register(c => c.Get<BoteTransport>());
 
