@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\client\src\Dbosoft.Bote.Rebus\Dbosoft.Bote.Rebus.csproj" />
+    <ProjectReference Include="..\..\src\Dbosoft.Bote.Rebus.Integration\Dbosoft.Bote.Rebus.Integration.csproj" />
   </ItemGroup>
 
   <ItemGroup>
