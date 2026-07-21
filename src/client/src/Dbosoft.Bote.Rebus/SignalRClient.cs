@@ -77,7 +77,14 @@ internal class SignalRClient(
 
     public async Task SendMessage(string queue, BoteMessage message)
     {
-        await _connection!.SendAsync("SendMessage", queue, message);
+        // Use InvokeAsync (not SendAsync): we must wait for the server-side handler
+        // to complete and surface its exceptions (rejected queue, blocked header,
+        // forward failure). SendAsync is fire-and-forget and would let the Rebus
+        // commit "succeed" even when the message was never accepted, silently losing
+        // it. Propagating the failure turns client->cloud from at-most-once into
+        // at-least-once: the failing commit is retried (durable incoming) or surfaced
+        // to the caller (which may enlist a Rebus outbox for durability).
+        await _connection!.InvokeAsync("SendMessage", queue, message);
     }
 
     public async Task SubscribeToTopic(string topicName)

@@ -110,17 +110,11 @@ internal sealed class BoteTransport : ITransport, IDisposable
             var messagesToSend = new ConcurrentQueue<(string Destination, BoteMessage Message)>();
 
             context.OnCommit(_ =>
-            {
-                // TODO fix defer messages
-
-                return Task.WhenAll(messagesToSend.ToList().Select(async t =>
-                {
-                    await _signalRClient.SendMessage(t.Destination, t.Message);
-
-                    //var errorText = $"Could not send message with ID {transportMessage.GetMessageId()} to '{message.DestinationAddress}'";
-                    //throw new RebusApplicationException(exception, errorText);
-                }));
-            });
+                // Let any send failure propagate out of the commit: SendMessage now
+                // awaits the server (InvokeAsync), so a rejected/failed send faults the
+                // commit and Rebus retries instead of silently dropping the message.
+                Task.WhenAll(messagesToSend.ToList().Select(t =>
+                    _signalRClient.SendMessage(t.Destination, t.Message))));
 
             return messagesToSend;
         });

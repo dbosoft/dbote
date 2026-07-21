@@ -58,7 +58,7 @@ configs:
                     "ForwardTo": "",
                     "LockDuration": "PT1M",
                     "MaxDeliveryCount": 3,
-                    "RequiresDuplicateDetection": false,
+                    "RequiresDuplicateDetection": true,
                     "RequiresSession": false
                   }
                 },
