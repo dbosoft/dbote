@@ -30,45 +30,48 @@ internal class DataBusOutgoingStep(
             return;
         }
 
-        _log.Debug("Bote Databus: copying attachment {attachmentId} to outbox", 
+        _log.Debug("Bote Databus: copying attachment {attachmentId} to outbox",
             attachmentId);
 
-        var uploadTask = Task.Run( async () =>
+        // The attachment MUST be fully staged in the outbox before the message that
+        // references it is sent - otherwise the message can outrun (or entirely lose) its
+        // attachment, and the worker downstream just reports "not ready" and reschedules
+        // until it dead-letters, with the real cause hidden. So upload synchronously and let
+        // a failure propagate (fails the send, so Rebus retries) instead of swallowing it.
+        try
         {
-            try
-            {
-                _log.Debug("Bote Databus: reading attachment {attachmentId}", attachmentId);
-                await using var stream = await dataBusStorage.Read(attachmentId);
-                var metadata = await dataBusStorage.ReadMetadata(attachmentId)
-                               ?? new Dictionary<string, string>();
+            _log.Debug("Bote Databus: reading attachment {attachmentId}", attachmentId);
+            await using var stream = await dataBusStorage.Read(attachmentId);
+            var metadata = await dataBusStorage.ReadMetadata(attachmentId)
+                           ?? new Dictionary<string, string>();
 
-                var outboxPath = $"{tenantId}/{attachmentId}";
+            var outboxPath = $"{tenantId}/{attachmentId}";
 
-                var outboxBlob = blobServiceClient.GetBlobContainerClient(
-                        outboxContainerName)
-                    .GetBlobClient(outboxPath);
+            var outboxBlob = blobServiceClient.GetBlobContainerClient(
+                    outboxContainerName)
+                .GetBlobClient(outboxPath);
 
+            if (stream.CanSeek)
                 stream.Position = 0;
 
-                await outboxBlob.UploadAsync(stream, new BlobUploadOptions
-                {
-                    Metadata = new Dictionary<string, string>(metadata)
-                    {
-                        [BoteStorageConstants.Metadata.TenantId] = tenantId,
-                    }
-                });
-
-                _log.Debug("Bote Databus: uploaded attachment {attachmentId}", 
-                    attachmentId);
-            }
-            catch (Exception ex)
+            // BlobUploadOptions overload overwrites, so a retried send re-stages idempotently.
+            await outboxBlob.UploadAsync(stream, new BlobUploadOptions
             {
-                _log.Error(ex, "Failed to upload attachment {attachmentId} to outbox", 
-                    attachmentId);
-            }
-        });
+                Metadata = new Dictionary<string, string>(metadata)
+                {
+                    [BoteStorageConstants.Metadata.TenantId] = tenantId,
+                }
+            });
 
-        await Task.WhenAny(uploadTask, Task.Delay(5000));
+            _log.Debug("Bote Databus: uploaded attachment {attachmentId}",
+                attachmentId);
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "Failed to upload attachment {attachmentId} to outbox",
+                attachmentId);
+            throw;
+        }
 
         await next();
     }

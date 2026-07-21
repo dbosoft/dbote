@@ -15,6 +15,8 @@ internal interface ISignalRClient
 {
     Task<string> GetQueueConnection();
 
+    Task<string> GetErrorQueueConnection();
+
     Task SendMessage(string queue, BoteMessage message);
 
     Task SubscribeToTopic(string topicName);
@@ -52,13 +54,15 @@ internal class SignalRClient(
     public void Initialize()
     {
         _log.Debug("Initializing dbote SignalR client...");
-        //TODO Make initial connection more reliable in case of network issues
         _connection = new HubConnectionBuilder()
             // TODO this must be URL of the Azure function with the negotiate endpoint
             .WithUrl(endpointUri, options =>
             {
                 options.AccessTokenProvider = GetAccessToken;
             })
+            // An edge client is disconnected routinely (token expiry closes the connection
+            // every ~15 min, networks drop). Without reconnect it would go silent for good.
+            .WithAutomaticReconnect(new BoteReconnectPolicy())
             .Build();
 
         _listener = _connection.On(nameof(IIncoming.NewMessage), async (string messageId) =>
@@ -66,7 +70,33 @@ internal class SignalRClient(
             await pendingMessagesIndicator.SetAsync();
         });
 
+        _connection.Reconnected += OnReconnected;
+        _connection.Closed += OnClosed;
+
         AsyncHelpers.RunSync(() => _connection.StartAsync());
+
+        // Cold start: messages may already be waiting in the queue from before we connected,
+        // and no push will arrive for those. Arm the indicator so the first receive drains them.
+        AsyncHelpers.RunSync(() => pendingMessagesIndicator.SetAsync());
+    }
+
+    private async Task OnReconnected(string? connectionId)
+    {
+        // While disconnected, messages may have been enqueued and their push notifications
+        // missed. Topic subscriptions survive in the worker's table storage, so pushes resume
+        // on their own; re-arming the indicator drains whatever queued up in the meantime.
+        _log.Info("dbote SignalR client reconnected, re-checking for pending messages");
+        await pendingMessagesIndicator.SetAsync();
+    }
+
+    private Task OnClosed(Exception? error)
+    {
+        // With the indefinite reconnect policy this should not normally fire.
+        if (error is not null)
+            _log.Warn(error, "dbote SignalR client connection closed with an error");
+        else
+            _log.Info("dbote SignalR client connection closed");
+        return Task.CompletedTask;
     }
 
     public async Task<string> GetQueueConnection()
@@ -75,9 +105,22 @@ internal class SignalRClient(
         return queueMetadata.Connection;
     }
 
+    public async Task<string> GetErrorQueueConnection()
+    {
+        var queueMetadata = await _connection!.InvokeAsync<BoteQueueMetadata>("GetErrorQueueMetadata");
+        return queueMetadata.Connection;
+    }
+
     public async Task SendMessage(string queue, BoteMessage message)
     {
-        await _connection!.SendAsync("SendMessage", queue, message);
+        // Use InvokeAsync (not SendAsync): we must wait for the server-side handler
+        // to complete and surface its exceptions (rejected queue, blocked header,
+        // forward failure). SendAsync is fire-and-forget and would let the Rebus
+        // commit "succeed" even when the message was never accepted, silently losing
+        // it. Propagating the failure turns client->cloud from at-most-once into
+        // at-least-once: the failing commit is retried (durable incoming) or surfaced
+        // to the caller (which may enlist a Rebus outbox for durability).
+        await _connection!.InvokeAsync("SendMessage", queue, message);
     }
 
     public async Task SubscribeToTopic(string topicName)
@@ -169,5 +212,11 @@ internal class SignalRClient(
     public void Dispose()
     {
         _listener?.Dispose();
+        if (_connection is not null)
+        {
+            _connection.Reconnected -= OnReconnected;
+            _connection.Closed -= OnClosed;
+            AsyncHelpers.RunSync(() => _connection.DisposeAsync().AsTask());
+        }
     }
 }

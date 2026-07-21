@@ -106,7 +106,21 @@ public class DataBusCopyProcessor(
 
         logger.LogInformation("starting copy for attachment {AttachmentId}: {Source} to {Destination}",
             request.AttachmentId, sourceBlob.Name, destBlob.Name);
-        await destBlob.StartCopyFromUriAsync(request.SourceBlobUri);
+        try
+        {
+            // Idempotency guard: the blob trigger is at-least-once and the inline path and the
+            // monitor queue can race. IfNoneMatch=* lets only the first copy win; a concurrent
+            // duplicate gets 409 and just falls through to monitoring the copy already running.
+            await destBlob.StartCopyFromUriAsync(request.SourceBlobUri, new BlobCopyFromUriOptions
+            {
+                DestinationConditions = new BlobRequestConditions { IfNoneMatch = ETag.All }
+            });
+        }
+        catch (RequestFailedException ex) when (ex.Status == 409)
+        {
+            logger.LogInformation("Copy already started for attachment {AttachmentId}; monitoring existing copy",
+                request.AttachmentId);
+        }
         request.MonitorCount = 0; // Reset for copy monitoring phase
 
         return (false, request);

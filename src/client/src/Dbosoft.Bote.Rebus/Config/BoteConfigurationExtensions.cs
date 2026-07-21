@@ -1,9 +1,11 @@
 ﻿using Dbosoft.Bote.Rebus.Subscriptions;
 using Dbosoft.Bote.Rebus.Transport;
 using Rebus.Config;
+using Rebus.Injection;
 using Rebus.Logging;
 using Rebus.Pipeline;
 using Rebus.Pipeline.Receive;
+using Rebus.Retry;
 using Rebus.Subscriptions;
 using Rebus.Threading;
 using Rebus.Timeouts;
@@ -28,15 +30,32 @@ public static class BoteConfigurationExtensions
         IHttpClientFactory httpClientFactory,
         BoteTransportOptions? options = null)
     {
-        Register(configurer, queueName, endpointUri, credentials, httpClientFactory, options);
+        Register(configurer, queueName,
+            c => new SignalRClient(endpointUri, credentials,
+                c.Get<IPendingMessagesIndicators>(),
+                c.Get<IRebusLoggerFactory>(),
+                httpClientFactory),
+            options);
+    }
+
+    /// <summary>
+    /// Test seam: configure the Bote transport against a supplied <see cref="ISignalRClient"/>
+    /// (e.g. one that hands out storage-queue SAS URIs directly), bypassing the real SignalR
+    /// connection. Keeps the full transport/error-handler wiring intact.
+    /// </summary>
+    internal static void UseBote(
+        this StandardConfigurer<ITransport> configurer,
+        string queueName,
+        ISignalRClient signalRClient,
+        BoteTransportOptions? options = null)
+    {
+        Register(configurer, queueName, _ => signalRClient, options);
     }
 
     private static void Register(
         StandardConfigurer<ITransport> configurer,
         string queueName,
-        Uri endpointUri,
-        BoteCredentials credentials,
-        IHttpClientFactory httpClientFactory,
+        Func<IResolutionContext, ISignalRClient> signalRClientFactory,
         BoteTransportOptions? options)
     {
         options ??= new BoteTransportOptions();
@@ -64,14 +83,7 @@ public static class BoteConfigurationExtensions
             .Register(_ => new PendingMessagesIndicators());
 
         configurer.OtherService<ISignalRClient>()
-            .Register(c =>
-            {
-                var loggerFactory = c.Get<IRebusLoggerFactory>();
-                var pendingMessagesIndicator = c.Get<IPendingMessagesIndicators>();
-                return new SignalRClient(endpointUri, credentials, pendingMessagesIndicator,
-                    loggerFactory,
-                    httpClientFactory);
-            });
+            .Register(signalRClientFactory);
 
         configurer.OtherService<BoteTransport>().Register(c =>
         {
@@ -93,6 +105,17 @@ public static class BoteConfigurationExtensions
             var signalRClient = c.Get<ISignalRClient>();
             return new BoteSubscriptionStorage(signalRClient);
         });
+
+        // Replace Rebus' default deadletter handler: poison messages must not be routed
+        // back through the SignalR SendMessage whitelist (which would reject the error
+        // queue). Instead they are written to the client's local error Storage Queue.
+        configurer.OtherService<IErrorQueueWriter>()
+            .Register(c => new BoteErrorQueueWriter(c.Get<ISignalRClient>()));
+
+        configurer.OtherService<IErrorHandler>()
+            .Register(c => new BoteErrorHandler(
+                c.Get<IErrorQueueWriter>(),
+                c.Get<IRebusLoggerFactory>()));
 
         configurer.Register(c => c.Get<BoteTransport>());
 

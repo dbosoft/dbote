@@ -89,7 +89,7 @@ app.UseAntiforgery();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.MapGet("/download/{fileId}", async (string fileId, IFileStorageService fileStorage) =>
+app.MapGet("/download/{fileId}", async (string fileId, IFileStorageService fileStorage, Rebus.Bus.IBus bus) =>
 {
     var (attachment, fileName) = fileStorage.GetFile(fileId);
 
@@ -98,7 +98,10 @@ app.MapGet("/download/{fileId}", async (string fileId, IFileStorageService fileS
         return Results.NotFound();
     }
 
-    var stream = await attachment.OpenRead();
+    // DataBusAttachment.OpenRead() resolves its storage from the ambient message context,
+    // which does not exist here (this is an HTTP request, not a Rebus handler). Read through
+    // the bus' DataBus API instead, which uses the configured IDataBusStorage directly.
+    var stream = await bus.Advanced.DataBus.OpenRead(attachment.Id);
     return Results.File(stream, "application/octet-stream", fileName);
 });
 

@@ -15,6 +15,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Dbosoft.Bote.Rebus.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Dbosoft.Bote.Integration.Abstractions\Dbosoft.Bote.Integration.Abstractions.csproj" />
     <ProjectReference Include="..\Dbosoft.Bote.Primitives\Dbosoft.Bote.Primitives.csproj" />
   </ItemGroup>

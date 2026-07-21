@@ -7,6 +7,7 @@ using Azure.Storage.Queues;
 using Azure.Storage.Queues.Models;
 using Dbosoft.Bote.Rebus.Config;
 using Dbosoft.Bote.Transport.Abstractions;
+using Rebus.Bus;
 using Rebus.Exceptions;
 using Rebus.Extensions;
 using Rebus.Logging;
@@ -20,7 +21,7 @@ namespace Dbosoft.Bote.Rebus.Transport;
 // https://github.dev/rebus-org/Rebus.AzureQueues/blob/master/Rebus.AzureQueues
 // Licensed under MIT License
 
-internal sealed class BoteTransport : ITransport, IDisposable
+internal sealed class BoteTransport : ITransport, IInitializable, IDisposable
 {
     /// <summary>
     /// External timeout manager address set to this magic address will be routed to the destination address specified by the <see cref="Headers.DeferredRecipient"/> header
@@ -29,6 +30,7 @@ internal sealed class BoteTransport : ITransport, IDisposable
 
     private readonly ILog _log;
     private readonly IAsyncTask _messageLockRenewalTask;
+    private readonly IAsyncTask _pendingMessagesReconcileTask;
     // TODO is transport multithreaded?
     private readonly ConcurrentDictionary<string, MessageLockRenewer> _messageLockRenewers = new();
     private readonly string? _queueName;
@@ -56,15 +58,42 @@ internal sealed class BoteTransport : ITransport, IDisposable
             RenewPeekLocks,
             prettyInsignificant: true,
             intervalSeconds: 10);
+        var reconcileSeconds = Math.Max(1, (int)options.PendingMessagesReconcileInterval.TotalSeconds);
+        _pendingMessagesReconcileTask = asyncTaskFactory.Create(
+            "Bote Rebus transport pending-messages reconcile",
+            ReconcilePendingMessages,
+            prettyInsignificant: true,
+            intervalSeconds: reconcileSeconds);
     }
 
     public string? Address => _queueName;
+
+    public void Initialize()
+    {
+        // One-way clients have no input queue - nothing to receive or reconcile.
+        if (Address is null)
+            return;
+
+        if (_options.AutomaticPeekLockRenewalEnabled)
+            _messageLockRenewalTask.Start();
+
+        // Safety net against the push-only polling model missing messages (lost push,
+        // arrived-while-disconnected, stranded retry). Rebus never started these background
+        // tasks before, so this also fixes the never-running lock renewal above.
+        if (_options.PendingMessagesReconcileInterval > TimeSpan.Zero)
+            _pendingMessagesReconcileTask.Start();
+    }
 
     public void CreateQueue(string address)
     {
         // Intentionally not implemented. The Bote infrastructure is responsible
         // for creating the necessary queues.
     }
+
+    // Periodically re-arm the pending-messages flag so an idle receive loop re-checks the
+    // queue even when no SignalR push arrives. An empty poll clears the flag again, so this
+    // costs at most one poll per interval when the queue is empty.
+    private Task ReconcilePendingMessages() => _pendingMessagesIndicator.SetAsync();
 
     public async Task<TransportMessage?> Receive(ITransactionContext context, CancellationToken cancellationToken)
     {
@@ -110,17 +139,11 @@ internal sealed class BoteTransport : ITransport, IDisposable
             var messagesToSend = new ConcurrentQueue<(string Destination, BoteMessage Message)>();
 
             context.OnCommit(_ =>
-            {
-                // TODO fix defer messages
-
-                return Task.WhenAll(messagesToSend.ToList().Select(async t =>
-                {
-                    await _signalRClient.SendMessage(t.Destination, t.Message);
-
-                    //var errorText = $"Could not send message with ID {transportMessage.GetMessageId()} to '{message.DestinationAddress}'";
-                    //throw new RebusApplicationException(exception, errorText);
-                }));
-            });
+                // Let any send failure propagate out of the commit: SendMessage now
+                // awaits the server (InvokeAsync), so a rejected/failed send faults the
+                // commit and Rebus retries instead of silently dropping the message.
+                Task.WhenAll(messagesToSend.ToList().Select(t =>
+                    _signalRClient.SendMessage(t.Destination, t.Message))));
 
             return messagesToSend;
         });
@@ -201,6 +224,13 @@ internal sealed class BoteTransport : ITransport, IDisposable
             {
                 // ignore if this fails
             }
+
+            // Re-arm polling for the redelivery: the message is visible again, but no SignalR
+            // push is sent for a retry. Without this, a concurrent empty poll (Rebus receives
+            // with parallelism > 1) clears the pending-messages flag while this message is
+            // briefly in flight, and the redelivery is never polled - so Rebus never reaches
+            // its max delivery count and the message is never dead-lettered.
+            await _pendingMessagesIndicator.SetAsync();
         });
 
         context.OnDisposed(ctx => _messageLockRenewers.TryRemove(messageId, out _));
@@ -256,5 +286,6 @@ internal sealed class BoteTransport : ITransport, IDisposable
     public void Dispose()
     {
         _messageLockRenewalTask.Dispose();
+        _pendingMessagesReconcileTask.Dispose();
     }
 }

@@ -12,6 +12,7 @@ import { DboteInsights } from "./constructs/dbote-insights";
 import { Environnment } from "./environment";
 import { DboteWorker } from "./constructs/dbote-worker";
 import { StorageTable } from "@cdktf/provider-azurerm/lib/storage-table";
+import { StorageManagementPolicy } from "@cdktf/provider-azurerm/lib/storage-management-policy";
 import { DboteBenchmark } from "./constructs/dbote-benchmark";
 import { DboteIdentityProvider } from "./constructs/dbote-identity-provider";
 
@@ -155,6 +156,30 @@ class DboteStack extends TerraformStack {
     new StorageTable(this, environment.formatName('stt', 'subscriptions'), {
       storageAccountName: storageAccount.name,
       name: 'subscriptions',
+    });
+
+    // DataBus attachment lifecycle (H4c). Attachments are staged as blobs and copied
+    // between the outbox/inbox/client-datastore containers. Success paths delete their
+    // source blob eagerly, but the remaining orphan classes cannot be deleted inline:
+    //   - failed/partial copies (a retried message must still find its attachment), and
+    //   - cloud->client broadcast blobs stored per-tenant at {tenantId}/{attachmentId}
+    //     and shared by every subscriber, so no single client may delete them.
+    // A bounded TTL is the retry-safe backstop that reaps every orphan. Only blob
+    // containers live in this account (queues + the subscriptions table are unaffected).
+    new StorageManagementPolicy(this, environment.formatName('stmp', 'databus-ttl'), {
+      storageAccountId: storageAccount.id,
+      rule: [{
+        name: 'databus-attachment-ttl',
+        enabled: true,
+        filters: {
+          blobTypes: ['blockBlob'],
+        },
+        actions: {
+          baseBlob: {
+            deleteAfterDaysSinceModificationGreaterThan: 7,
+          },
+        },
+      }],
     });
 
     // role assignments - worker

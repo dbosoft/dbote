@@ -43,4 +43,14 @@ public class BoteTransportOptions
     /// you get with Azure Queue. Will not work with prefetch of messages.
     /// </summary>
     public bool AutomaticPeekLockRenewalEnabled { get; set; } = false;
+
+    /// <summary>
+    /// Safety-net interval at which the transport re-checks its queue for pending messages,
+    /// independent of SignalR push notifications. This reconciles against missed pushes,
+    /// messages that arrived while disconnected, and stranded retries - the push-only model
+    /// would otherwise leave such messages unpolled. Set to <see cref="TimeSpan.Zero"/> to
+    /// rely on push notifications and explicit re-arming only. Defaults to 60 seconds, which
+    /// is one empty poll per minute on an idle client - negligible compared to continuous polling.
+    /// </summary>
+    public TimeSpan PendingMessagesReconcileInterval { get; set; } = TimeSpan.FromSeconds(60);
 }
