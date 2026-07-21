@@ -1,5 +1,6 @@
 ﻿using Dbosoft.Bote.AppConfiguration;
 using Dbosoft.Bote.Options;
+using Dbosoft.Bote.Primitives;
 using Dbosoft.Bote.Rebus.Integration;
 using Dbosoft.Bote.Samples.Chat.Cloud;
 using Dbosoft.Bote.Samples.Chat.Cloud.Handler;
@@ -34,7 +35,8 @@ builder.Services.AddRebus((configure, serviceProvider) =>
             o.EnableBote(options.Queues.Clients);
             o.EnableBoteDataBus(
                 builder.Configuration["dbote:Cloud:Storage:Connection"]!,
-                builder.Configuration["dbote:Cloud:Storage:CloudOutboxContainer"]!);
+                builder.Configuration["dbote:Cloud:Storage:CloudOutboxContainer"]
+                    ?? BoteStorageConstants.Outbox);
 
         })
         .Transport(t => t.UseAzureServiceBus(builder.Configuration.GetSection("dbote:Cloud:ServiceBus:Connection"), options.Queues.Cloud))

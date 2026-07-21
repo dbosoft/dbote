@@ -59,6 +59,12 @@ public static class BoteConfigurationExtensions
         string connectionString,
         string outboxContainerName = BoteStorageConstants.Outbox)
     {
+        // Guard against a null/empty container name (e.g. an unset config value passed
+        // with the null-forgiving operator) which would otherwise surface much later as
+        // a NullReferenceException inside DataBusOutgoingStep when addressing the blob.
+        if (string.IsNullOrWhiteSpace(outboxContainerName))
+            outboxContainerName = BoteStorageConstants.Outbox;
+
         // Register DataBusIncomingStep to import attachments from cloud inbox
         // Flow: Client uploads to client-outbox → BoteWorker copies to cloud-inbox → Cloud reads from cloud-inbox
         configurer.Decorate<IPipeline>(context =>
