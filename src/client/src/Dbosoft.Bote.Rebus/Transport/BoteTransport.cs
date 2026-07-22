@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -27,6 +28,10 @@ internal sealed class BoteTransport : ITransport, IInitializable, IDisposable
     /// External timeout manager address set to this magic address will be routed to the destination address specified by the <see cref="Headers.DeferredRecipient"/> header
     /// </summary>
     internal const string MagicDeferredMessagesAddress = "___deferred___";
+
+    // W3C trace-context header names (https://www.w3.org/TR/trace-context/).
+    private const string TraceParentHeader = "traceparent";
+    private const string TraceStateHeader = "tracestate";
 
     private readonly ILog _log;
     private readonly IAsyncTask _messageLockRenewalTask;
@@ -163,6 +168,7 @@ internal sealed class BoteTransport : ITransport, IInitializable, IDisposable
 
             var clonedHeaders = headers.Clone();
             clonedHeaders.Remove(Headers.DeferredRecipient);
+            AddTraceContext(clonedHeaders);
 
             outgoingMessages.Enqueue((actualDestinationAddress, new BoteMessage()
             {
@@ -173,13 +179,34 @@ internal sealed class BoteTransport : ITransport, IInitializable, IDisposable
             return Task.CompletedTask;
         }
 
+        var outgoingHeaders = transportMessage.Headers.Clone();
+        AddTraceContext(outgoingHeaders);
+
         outgoingMessages.Enqueue((destinationAddress, new BoteMessage()
         {
-            Headers = transportMessage.Headers.Clone(),
+            Headers = outgoingHeaders,
             Body = Encoding.UTF8.GetString(transportMessage.Body),
         }));
 
         return Task.CompletedTask;
+    }
+
+    // Carry the ambient W3C trace context onto the outgoing message so a distributed trace
+    // the application started survives the SignalR/Storage-Queue hop instead of breaking at
+    // the framework boundary. The worker's converter already forwards all headers on, and the
+    // cloud->client direction inherits the Service Bus trace context the same way. Never
+    // overwrite a trace id the message already carries.
+    private static void AddTraceContext(IDictionary<string, string> headers)
+    {
+        var activity = Activity.Current;
+        if (activity?.IdFormat != ActivityIdFormat.W3C || activity.Id is null)
+            return;
+
+        headers.TryAdd(TraceParentHeader, activity.Id);
+
+        var traceState = activity.TraceStateString;
+        if (!string.IsNullOrEmpty(traceState))
+            headers.TryAdd(TraceStateHeader, traceState);
     }
     private void SetUpCompletion(ITransactionContext context, QueueMessage cloudQueueMessage)
     {

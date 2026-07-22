@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using AwesomeAssertions;
 using Dbosoft.Bote.Rebus.Config;
 using Dbosoft.Bote.Rebus.Transport;
@@ -58,6 +59,30 @@ public class BoteTransportSendTests
 
         signalR.LastMessage!.Headers.Should().ContainKey(Headers.MessageId)
             .WhoseValue.Should().Be("msg-1");
+    }
+
+    [Fact]
+    public async Task Commit_propagates_the_ambient_w3c_trace_context()
+    {
+        var signalR = new FakeSignalRClient();
+        var transport = CreateTransport(signalR);
+
+        var activity = new Activity("test-trace");
+        activity.SetIdFormat(ActivityIdFormat.W3C);
+        activity.Start();
+        try
+        {
+            using var scope = new RebusTransactionScope();
+            await transport.Send("some-queue", NewMessage("msg-1"), scope.TransactionContext);
+            await scope.CompleteAsync();
+        }
+        finally
+        {
+            activity.Stop();
+        }
+
+        signalR.LastMessage!.Headers.Should().ContainKey("traceparent")
+            .WhoseValue.Should().Be(activity.Id);
     }
 
     private static BoteTransport CreateTransport(ISignalRClient signalR) =>

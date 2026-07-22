@@ -11,6 +11,9 @@ namespace Dbosoft.Bote.BoteWorker;
 
 internal partial class BoteHub
 {
+    // Azure Storage Queue hard limit for a single message payload (64 KiB).
+    private const int MaxStorageQueueMessageBytes = 64 * 1024;
+
     /// <summary>
     /// Message from client to be sent to Service Bus queue.
     /// </summary>
@@ -360,10 +363,31 @@ internal partial class BoteHub
             tenantId, clientId);
 
         var queueClient = await tenantStorageResolver.ResolveQueueClient(tenantId, clientId);
-        await queueClient.CreateIfNotExistsAsync();
+        var payload = JsonSerializer.Serialize(boteMessage);
 
-        var receipt = await queueClient.SendMessageAsync(
-            JsonSerializer.Serialize(boteMessage));
+        // Storage Queue messages are capped at 64 KiB. A too-large message would otherwise
+        // fail deep in the send with an opaque storage error; surface a defined error naming
+        // the limit and the DataBus (attachment) alternative for large payloads instead.
+        var payloadBytes = System.Text.Encoding.UTF8.GetByteCount(payload);
+        if (payloadBytes > MaxStorageQueueMessageBytes)
+            throw new InvalidOperationException(
+                $"Message for {tenantId}/{clientId} is {payloadBytes} bytes, exceeding the " +
+                $"{MaxStorageQueueMessageBytes}-byte Storage Queue limit. Send large payloads as a " +
+                "DataBus attachment instead of inline.");
+
+        Azure.Response<Azure.Storage.Queues.Models.SendReceipt> receipt;
+        try
+        {
+            // The client's queue is created at connect time (GetQueueMetadata), so it almost
+            // always exists here. Send optimistically and create only on the rare 404 miss,
+            // instead of a create round-trip on every delivery (incl. every broadcast subscriber).
+            receipt = await queueClient.SendMessageAsync(payload);
+        }
+        catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+        {
+            await queueClient.CreateIfNotExistsAsync();
+            receipt = await queueClient.SendMessageAsync(payload);
+        }
 
         // Notify specific client via SignalR
         await Clients.User($"{tenantId}-{clientId}").NewMessage(receipt.Value.MessageId);
