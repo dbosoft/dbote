@@ -27,7 +27,7 @@ internal partial class BoteHub
         [SignalRTrigger(
             HubName,
             "messages",
-            nameof(this.SendMessage),
+            nameof(SendMessage),
             nameof(queue), nameof(message),
             ConnectionStringSetting = "dbote:Worker:SignalR:Connection")]
         SignalRInvocationContext invocationContext,

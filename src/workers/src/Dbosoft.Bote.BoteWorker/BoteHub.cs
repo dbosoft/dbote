@@ -106,7 +106,7 @@ internal partial class BoteHub(
         [SignalRTrigger(
             HubName,
             "messages",
-            nameof(this.GetQueueMetadata),
+            nameof(GetQueueMetadata),
             ConnectionStringSetting = "dbote:Worker:SignalR:Connection")]
         SignalRInvocationContext invocationContext)
     {
@@ -140,7 +140,7 @@ internal partial class BoteHub(
         [SignalRTrigger(
             HubName,
             "messages",
-            nameof(this.GetErrorQueueMetadata),
+            nameof(GetErrorQueueMetadata),
             ConnectionStringSetting = "dbote:Worker:SignalR:Connection")]
         SignalRInvocationContext invocationContext)
     {

@@ -85,7 +85,7 @@ namespace Dbosoft.Bote.BoteWorker
             [SignalRTrigger(
             HubName,
             "messages",
-            nameof(this.GetDataBusAttachmentUri),
+            nameof(GetDataBusAttachmentUri),
             nameof(attachmentId),
             ConnectionStringSetting = "dbote:Worker:SignalR:Connection")]
         SignalRInvocationContext invocationContext,
@@ -138,7 +138,7 @@ namespace Dbosoft.Bote.BoteWorker
             [SignalRTrigger(
             HubName,
             "messages",
-            nameof(this.GetDataBusAttachmentUploadUri),
+            nameof(GetDataBusAttachmentUploadUri),
             nameof(attachmentId),
             ConnectionStringSetting = "dbote:Worker:SignalR:Connection")]
         SignalRInvocationContext invocationContext,
@@ -174,7 +174,7 @@ namespace Dbosoft.Bote.BoteWorker
             [SignalRTrigger(
             HubName,
             "messages",
-            nameof(this.GetAttachmentMetadata),
+            nameof(GetAttachmentMetadata),
             nameof(attachmentId),
             ConnectionStringSetting = "dbote:Worker:SignalR:Connection")]
         SignalRInvocationContext invocationContext,
@@ -212,7 +212,7 @@ namespace Dbosoft.Bote.BoteWorker
             [SignalRTrigger(
             HubName,
             "messages",
-            nameof(this.AttachmentUploaded),
+            nameof(AttachmentUploaded),
             nameof(attachmentId),
             ConnectionStringSetting = "dbote:Worker:SignalR:Connection")]
         SignalRInvocationContext invocationContext,

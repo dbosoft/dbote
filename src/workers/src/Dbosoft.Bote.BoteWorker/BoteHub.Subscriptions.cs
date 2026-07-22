@@ -83,7 +83,7 @@ namespace Dbosoft.Bote.BoteWorker
             [SignalRTrigger(
             HubName,
             "messages",
-            nameof(this.SubscribeToTopic),
+            nameof(SubscribeToTopic),
             nameof(topicName),
             ConnectionStringSetting = "dbote:Worker:SignalR:Connection")]
         SignalRInvocationContext invocationContext,
@@ -133,7 +133,7 @@ namespace Dbosoft.Bote.BoteWorker
             [SignalRTrigger(
             HubName,
             "messages",
-            nameof(this.UnsubscribeFromTopic),
+            nameof(UnsubscribeFromTopic),
             nameof(topicName),
             ConnectionStringSetting = "dbote:Worker:SignalR:Connection")]
         SignalRInvocationContext invocationContext,
