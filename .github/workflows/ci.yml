@@ -16,19 +16,16 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restore
-        run: dotnet restore Dbote.sln
-
-      - name: Build
-        run: dotnet build Dbote.sln -c Release --no-restore
-
+      # Scoped to the test projects (which pull in the worker, client transport and
+      # integration libraries transitively) rather than the whole solution, so the samples
+      # and benchmark projects don't gate the build.
       - name: Unit tests
         run: |
-          dotnet test test/Dbosoft.Bote.Rebus.Tests/Dbosoft.Bote.Rebus.Tests.csproj -c Release --no-build
-          dotnet test test/Dbosoft.Bote.Client.KeyGenerator.Tests/Dbosoft.Bote.Client.KeyGenerator.Tests.csproj -c Release --no-build
+          dotnet test test/Dbosoft.Bote.Rebus.Tests/Dbosoft.Bote.Rebus.Tests.csproj -c Release
+          dotnet test test/Dbosoft.Bote.Client.KeyGenerator.Tests/Dbosoft.Bote.Client.KeyGenerator.Tests.csproj -c Release
 
       # Integration tests use Testcontainers to start a real Azurite. GitHub-hosted Linux
       # runners have Docker available, so no DOCKER_HOST / Ryuk overrides are needed (unlike
       # the local Podman setup documented in test/README.md).
       - name: Integration tests (Testcontainers/Azurite)
-        run: dotnet test test/Dbosoft.Bote.Rebus.IntegrationTests/Dbosoft.Bote.Rebus.IntegrationTests.csproj -c Release --no-build
+        run: dotnet test test/Dbosoft.Bote.Rebus.IntegrationTests/Dbosoft.Bote.Rebus.IntegrationTests.csproj -c Release
