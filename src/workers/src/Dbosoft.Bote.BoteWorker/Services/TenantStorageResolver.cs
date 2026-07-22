@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Azure.Storage.Blobs;
 using Azure.Storage.Queues;
 using Dbosoft.Bote.Options;
@@ -7,20 +8,25 @@ namespace Dbosoft.Bote.BoteWorker.Services;
 
 /// <summary>
 /// Default implementation that uses centralized storage accounts for all tenants.
+/// Azure Storage clients are thread-safe and hold a connection pool, so they are cached and
+/// reused rather than re-created on every resolve (N2) - at 1000+ tenants with a high call
+/// rate, constructing a fresh client per call is avoidable overhead.
 /// </summary>
 public class DefaultTenantStorageResolver(IOptions<ClientStorageOptions> options) : ITenantStorageResolver
 {
-    public ValueTask<(BlobServiceClient, string)> ResolveClientDataStore(string tenantId)
-    {
-        var client = new BlobServiceClient(options.Value.Connection);
-        return ValueTask.FromResult((client, $"{options.Value.Prefix}-ds"));
+    private readonly Lazy<BlobServiceClient> _blobServiceClient =
+        new(() => new BlobServiceClient(options.Value.Connection));
 
-    }
+    private readonly ConcurrentDictionary<string, QueueClient> _queueClients = new();
+
+    public ValueTask<(BlobServiceClient, string)> ResolveClientDataStore(string tenantId) =>
+        ValueTask.FromResult((_blobServiceClient.Value, $"{options.Value.Prefix}-ds"));
 
     public ValueTask<QueueClient> ResolveQueueClient(string tenantId, string id)
     {
-        var client = new QueueClient(options.Value.Connection,
-            $"{options.Value.Prefix}-{tenantId}-{id}");
+        var queueName = $"{options.Value.Prefix}-{tenantId}-{id}";
+        var client = _queueClients.GetOrAdd(queueName,
+            name => new QueueClient(options.Value.Connection, name));
         return new ValueTask<QueueClient>(client);
     }
 }

@@ -75,7 +75,9 @@ class DboteStack extends TerraformStack {
       location,
       resourceGroupName,
       name: serviceBusNamespaceName,
-      sku: 'Basic',
+      // Standard, not Basic: the worker reschedules not-ready attachments with
+      // ScheduleMessageAsync (scheduled/deferred messages), which the Basic SKU does not support.
+      sku: 'Standard',
     });
     
     // This is not optimal but there is no way to extract the hostname from
@@ -86,6 +88,13 @@ class DboteStack extends TerraformStack {
     const cloudQueue = new ServicebusQueue(this, environment.formatName('sbq', 'cloud'), {
       namespaceId: serviceBusNamespace.id,
       name: environment.formatName('sbq', 'cloud'),
+    });
+
+    // The worker's CloudIncomingMonitor trigger reads from this queue (attachment reschedule
+    // path). It was missing from infra, so the deployed trigger had no queue to bind to.
+    const cloudIncomingQueue = new ServicebusQueue(this, environment.formatName('sbq', 'cloud-incoming'), {
+      namespaceId: serviceBusNamespace.id,
+      name: environment.formatName('sbq', 'cloud-incoming'),
     });
 
     const clientsQueue = new ServicebusQueue(this, environment.formatName('sbq', 'clients'), {
@@ -226,6 +235,7 @@ class DboteStack extends TerraformStack {
     worker.addAppSetting('dbote__Worker__ServiceBus__Connection__fullyQualifiedNamespace', fullyQualifiedNamespace);
     worker.addAppSetting('dbote__Worker__ServiceBus__Connection__credential', 'managedidentity');
     worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Cloud', cloudQueue.name);
+    worker.addAppSetting('dbote__Worker__ServiceBus__Queues__CloudIncoming', cloudIncomingQueue.name);
     worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Clients', clientsQueue.name);
     worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Error', errorQueue.name);
     worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Events', eventsQueue.name);

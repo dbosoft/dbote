@@ -7,8 +7,7 @@ namespace Dbosoft.Bote.Primitives;
 /// (<see cref="BoteHeaders.TenantId"/>/<see cref="BoteHeaders.ClientId"/>), routing
 /// (<see cref="BoteHeaders.Topic"/>), the cloud-inbox SAS
 /// (<see cref="BoteHeaders.DataBusInboxSas"/>), retry tracking
-/// (<see cref="BoteHeaders.ReScheduleCounter"/>), the signature
-/// (<see cref="BoteHeaders.Signature"/>) - and a client must not set any of it.
+/// (<see cref="BoteHeaders.ReScheduleCounter"/>) - and a client must not set any of it.
 /// The one exception is <see cref="BoteHeaders.AttachmentId"/>, which the client
 /// legitimately sets to reference a DataBus upload. Rebus envelope headers (<c>rbs2-*</c>)
 /// and any non-<c>dbote-</c> header pass through.

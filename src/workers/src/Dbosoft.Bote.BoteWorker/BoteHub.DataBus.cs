@@ -117,9 +117,11 @@ namespace Dbosoft.Bote.BoteWorker
                 throw new InvalidOperationException($"Attachment {attachmentId} not found");
             }
 
-            // Generate URI - short-lived; the client fetches this on demand right before reading.
+            // Generate URI - short-lived and read-only. The client only reads its attachment;
+            // it never deletes (per-tenant blobs are shared across a tenant's clients, and the
+            // H4c TTL policy reaps them), so a Delete capability here would be unused and unsafe.
             var uri = blobClient.GenerateBlobSasUri(
-                BlobSasPermissions.Read | BlobSasPermissions.Delete,
+                BlobSasPermissions.Read,
                 DateTimeOffset.UtcNow.AddHours(1));
 
             logger.LogInformation("Issued read URI for tenant {TenantId}, client {ClientId}, attachment {AttachmentId}",
