@@ -16,6 +16,14 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      # The repo's nuget.config lists private dbosoft Azure DevOps feeds that require auth and
+      # return 401 on CI. No project actually references a private package (all are on
+      # nuget.org), so disable those sources and restore from nuget.org only.
+      - name: Use nuget.org only
+        run: |
+          dotnet nuget disable source Library
+          dotnet nuget disable source Public
+
       # Scoped to the test projects (which pull in the worker, client transport and
       # integration libraries transitively) rather than the whole solution, so the samples
       # and benchmark projects don't gate the build.
