@@ -73,7 +73,10 @@ public class PoisonRedeliveryEndToEndTests
         handleCount.Should().BeGreaterThanOrEqualTo(2);
 
         using var doc = JsonDocument.Parse(poison!);
-        doc.RootElement.GetProperty("Body").GetString().Should().Contain("boom");
+        // Body is a ReadOnlyMemory<byte>, which System.Text.Json emits as Base64;
+        // decode it back to the UTF-8 payload before asserting on its content.
+        var body = doc.RootElement.GetProperty("Body").GetBytesFromBase64();
+        System.Text.Encoding.UTF8.GetString(body).Should().Contain("boom");
 
         var headers = doc.RootElement.GetProperty("Headers");
         headers.GetProperty(Headers.MessageId).GetString().Should().Be("poison-1");
