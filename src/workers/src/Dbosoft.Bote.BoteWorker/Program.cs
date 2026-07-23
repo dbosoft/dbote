@@ -39,6 +39,8 @@ builder.Services.Configure<ClientStorageOptions>(builder.Configuration.GetSectio
 
 builder.Services.AddServerlessHub<BoteHub>();
 
+builder.Services.AddSingleton<WorkerMetrics>();
+builder.Services.AddSingleton<ServiceBusSenderCache>();
 builder.Services.AddSingleton<IMessageConverter, MessageConverter>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ITokenValidationService, TokenValidationService>();
@@ -51,7 +53,18 @@ builder.Services.AddAzureClients(clientBuilder =>
     clientBuilder.UseCredential(new DefaultAzureCredential());
     clientBuilder.AddServiceBusClient(builder.Configuration.GetSection("dbote:Worker:ServiceBus:Connection"));
     clientBuilder.AddQueueServiceClient(builder.Configuration.GetSection("dbote:Worker:Storage:Connection"));
-    clientBuilder.AddQueueServiceClient(builder.Configuration.GetSection("AzureWebJobsStorage"))
+
+    // AzureWebJobsStorage is a plain connection string locally, but on a Flex Consumption plan it
+    // is an identity-based connection that exposes only an account name
+    // (AzureWebJobsStorage__accountName) with an empty AzureWebJobsStorage value. The
+    // AddQueueServiceClient(IConfiguration) overload only understands connectionString/serviceUri,
+    // so fall back to building from the account name + the ambient managed identity (UseCredential).
+    var awjsConnection = builder.Configuration["AzureWebJobsStorage"];
+    var awjsAccount = builder.Configuration["AzureWebJobsStorage:accountName"];
+    var awjsClient = !string.IsNullOrWhiteSpace(awjsConnection)
+        ? clientBuilder.AddQueueServiceClient(awjsConnection)
+        : clientBuilder.AddQueueServiceClient(new Uri($"https://{awjsAccount}.queue.core.windows.net"));
+    awjsClient
         .WithName("AzureWebJobsStorage")
         .ConfigureOptions(options => options.MessageEncoding = Azure.Storage.Queues.QueueMessageEncoding.Base64);
     clientBuilder.AddTableServiceClient(builder.Configuration.GetSection("dbote:Worker:Storage:Connection"));

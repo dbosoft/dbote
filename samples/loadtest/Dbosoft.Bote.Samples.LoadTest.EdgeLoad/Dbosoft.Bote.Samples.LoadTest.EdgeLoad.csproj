@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.12.0" />
+    <PackageReference Include="Rebus" Version="8.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\client\src\Dbosoft.Bote.Rebus\Dbosoft.Bote.Rebus.csproj" />
+    <ProjectReference Include="..\..\..\src\Dbosoft.Bote.Primitives\Dbosoft.Bote.Primitives.csproj" />
+    <ProjectReference Include="..\Dbosoft.Bote.Samples.LoadTest.Messages\Dbosoft.Bote.Samples.LoadTest.Messages.csproj" />
+  </ItemGroup>
+
+</Project>

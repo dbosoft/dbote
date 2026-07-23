@@ -23,7 +23,7 @@ public class BoteErrorHandlerTests
         await handler.HandlePoisonMessage(NewMessage("msg-1", "the body"), NewContext(), NewError());
 
         writer.WriteCount.Should().Be(1);
-        writer.LastMessage!.Body.Should().Be("the body");
+        writer.LastMessage!.Body.ToArray().Should().Equal(Encoding.UTF8.GetBytes("the body"));
     }
 
     [Fact]

@@ -129,11 +129,13 @@ internal sealed class BoteTransport : ITransport, IInitializable, IDisposable
         SetUpCompletion(context, queueMessage);
 
         var boteMessage = JsonSerializer.Deserialize<BoteMessage>(
-            queueMessage.Body.ToString());
+            queueMessage.Body.ToMemory().Span);
 
         var transportMessage = new TransportMessage(
             boteMessage!.Headers.ToDictionary(),
-            Encoding.UTF8.GetBytes(boteMessage.Body));
+            // Rebus' TransportMessage is defined in terms of byte[], so this copy is unavoidable
+            // here (client receive path, not the worker hot path).
+            boteMessage.Body.ToArray());
         return transportMessage;
     }
 
@@ -173,7 +175,7 @@ internal sealed class BoteTransport : ITransport, IInitializable, IDisposable
             outgoingMessages.Enqueue((actualDestinationAddress, new BoteMessage()
             {
                 Headers = clonedHeaders,
-                Body = Encoding.UTF8.GetString(transportMessage.Body),
+                Body = transportMessage.Body,
             }));
 
             return Task.CompletedTask;
@@ -185,7 +187,7 @@ internal sealed class BoteTransport : ITransport, IInitializable, IDisposable
         outgoingMessages.Enqueue((destinationAddress, new BoteMessage()
         {
             Headers = outgoingHeaders,
-            Body = Encoding.UTF8.GetString(transportMessage.Body),
+            Body = transportMessage.Body,
         }));
 
         return Task.CompletedTask;
@@ -298,12 +300,15 @@ internal sealed class BoteTransport : ITransport, IInitializable, IDisposable
             {
                 return await operation(_queueClient);
             }
-            catch (RequestFailedException rfe) when (rfe.Status == (int)HttpStatusCode.Unauthorized)
+            catch (RequestFailedException rfe)
+                when (rfe.Status is (int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden)
             {
-
+                // The queue SAS expired (Storage returns 403 on an expired/invalid signature, not
+                // just 401) or was revoked - fall through to fetch a fresh one. Without handling
+                // 403 the client goes permanently silent once its ~1h SAS expires.
             }
         }
-        
+
         var queueConnection = await _signalRClient.GetQueueConnection();
         _queueClient = new QueueClient(new Uri(queueConnection));
 

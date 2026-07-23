@@ -102,6 +102,12 @@ export class DboteIdentityProvider extends Construct {
                 'AzureWebJobsSecretStorageType': 'keyvault',
                 'AzureWebJobsSecretStorageKeyVaultUri': functionKeyVault.vaultUri,
                 'BasicIdentityProvider__Authority': `https://${functionAppName}.azurewebsites.net/api`,
+                // Stable signing key shared across instances via Key Vault (the secret is provisioned
+                // out of band; the function identity has Key Vault Secrets Officer below to resolve it).
+                'BasicIdentityProvider__SigningKeyPem': `@Microsoft.KeyVault(SecretUri=${functionKeyVault.vaultUri}secrets/idp-signing-key/)`,
+                // Shared client registry in Table Storage (this account; the identity has the Table
+                // Data Contributor role below) so registrations are visible across all instances.
+                'BasicIdentityProvider__TableServiceUri': functionStorageAccount.primaryTableEndpoint,
                 // Audience will be set by main.ts after worker is created
             },
         });

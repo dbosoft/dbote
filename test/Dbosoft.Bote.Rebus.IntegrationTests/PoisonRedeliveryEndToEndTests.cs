@@ -91,7 +91,7 @@ public class PoisonRedeliveryEndToEndTests
                 [Headers.ContentType] = "application/json;charset=utf-8",
                 [Headers.Intent] = Headers.IntentOptions.PointToPoint,
             },
-            Body = JsonSerializer.Serialize(new PoisonPayload { Text = text }),
+            Body = JsonSerializer.SerializeToUtf8Bytes(new PoisonPayload { Text = text }),
         };
 
         await inbound.SendMessageAsync(JsonSerializer.Serialize(message));

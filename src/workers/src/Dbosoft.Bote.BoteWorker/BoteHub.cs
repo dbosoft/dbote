@@ -30,14 +30,26 @@ internal partial class BoteHub(
     ITokenValidationService tokenValidationService,
     IOptions<OpenIdOptions> openIdOptions, 
     IOptions<ServiceBusOptions> serviceBusOptions,
-    ServiceBusClient serviceBusClient,
     ITenantStorageResolver tenantStorageResolver,
     BlobServiceClient blobServiceClient,
     TableServiceClient tableServiceClient,
-    DataBusCopyProcessor copyProcessor)
+    DataBusCopyProcessor copyProcessor,
+    WorkerMetrics workerMetrics,
+    ServiceBusSenderCache senderCache)
     : ServerlessHub<IMessages>(serviceProvider)
 {
     private const string HubName = nameof(BoteHub);
+
+    /// <summary>Diagnostic: per-phase worker timings (inbound/outbound hot path) as JSON.
+    /// Admin-level so it is protected by the host master key (not publicly anonymous).</summary>
+    [Function("Metrics")]
+    public async Task<HttpResponseData> Metrics(
+        [HttpTrigger(AuthorizationLevel.Admin, "get")] HttpRequestData req)
+    {
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteAsJsonAsync(workerMetrics.Snapshot());
+        return response;
+    }
 
 
     [Function("negotiate")]
@@ -114,7 +126,9 @@ internal partial class BoteHub(
         var clientId = ExtractClientId(invocationContext);
 
         var queueClient = await tenantStorageResolver.ResolveQueueClient(tenantId, clientId);
-        await queueClient.CreateAsync();
+        // CreateIfNotExists (not Create): this is called again whenever a client refreshes an
+        // expired queue SAS, and Create would throw 409 on the already-existing queue.
+        await queueClient.CreateIfNotExistsAsync();
         var uri = queueClient.GenerateSasUri(
             QueueSasPermissions.Read | QueueSasPermissions.Process | QueueSasPermissions.Update,
             DateTimeOffset.UtcNow.AddHours(1));

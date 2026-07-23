@@ -42,7 +42,7 @@ internal sealed class BoteErrorHandler(
         var message = new BoteMessage
         {
             Headers = transportMessage.Headers.Clone(),
-            Body = Encoding.UTF8.GetString(transportMessage.Body),
+            Body = transportMessage.Body,
         };
 
         // Annotate with the final error, like Rebus' default deadletter handler, so the

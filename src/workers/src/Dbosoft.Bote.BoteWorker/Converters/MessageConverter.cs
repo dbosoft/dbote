@@ -30,10 +30,9 @@ internal class MessageConverter : IMessageConverter
         return new BoteMessage
         {
             Headers = headers,
-            // TODO Fix performance https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/use-utf8jsonwriter#write-raw-json
-            // TODO or do we need to support binary data?
-            // TODO handle binary data properly
-            Body = serviceBusMessage.Body.ToString(),
+            // Wrap the incoming body buffer without copying - it is opaque to the gateway, so there
+            // is no reason to decode it to a UTF-16 string (or even copy the bytes) per message.
+            Body = serviceBusMessage.Body.ToMemory(),
         };
     }
 

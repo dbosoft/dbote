@@ -1,0 +1,92 @@
+services:
+  # Create the DataBus blob containers the claim-check flow copies attachments through.
+  storage-init:
+    environment:
+      "BLOB_CONTAINERS": "bote-outbox,bote-inbox"
+  # Podman: the service-bus management API image runs as a non-root user but binds port 80.
+  # Run it as root so it can bind (host-side also needs
+  # `net.ipv4.ip_unprivileged_port_start=80` on the podman machine - see README).
+  servicebus-api:
+    user: "0:0"
+
+configs:
+  servicebus:
+    content: |
+      {
+        "UserConfig": {
+          "Namespaces": [
+            {
+              "Name": "sbemulatorns",
+              "Queues": [
+                {
+                  "Name": "bote-sample-loadtest-cloud",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": true,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "bote-sample-loadtest-cloud-incoming",
+                  "Properties": {
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 10,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "bote-sample-loadtest-clients",
+                  "Properties": {
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 10,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "bote-sample-loadtest-error",
+                  "Properties": {
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 10,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
+                  "Name": "bote-sample-loadtest-events",
+                  "Properties": {
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 10,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                }
+              ]
+            }
+          ],
+          "Logging": { "Type": "File" }
+        }
+      }
+  signalr:
+    content: |
+      {
+        "UpstreamSettings": {
+          "Templates": [
+            {
+              "UrlTemplate": "http://dbote-worker/runtime/webhooks/signalr?code=master-secret",
+              "EventPattern": "*",
+              "HubPattern": "*",
+              "CategoryPattern": "*"
+            }
+          ]
+        }
+      }

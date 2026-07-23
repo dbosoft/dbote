@@ -13,13 +13,17 @@ import { Environnment } from "./environment";
 import { DboteWorker } from "./constructs/dbote-worker";
 import { StorageTable } from "@cdktf/provider-azurerm/lib/storage-table";
 import { StorageManagementPolicy } from "@cdktf/provider-azurerm/lib/storage-management-policy";
-import { DboteBenchmark } from "./constructs/dbote-benchmark";
+// Benchmark load generator is skipped for the initial worker-only deploy (it needs the
+// pre-existing acrbotetest container registry, which lives in the old subscription).
+// import { DboteBenchmark } from "./constructs/dbote-benchmark";
 import { DboteIdentityProvider } from "./constructs/dbote-identity-provider";
+import { DboteLoadTestDashboard } from "./constructs/dbote-loadtest-dashboard";
+import { DboteLoadTestController } from "./constructs/dbote-loadtest-controller";
 
 const location = "westeurope"; // Define the location for resources
 const resourceGroupName = "rg-dbote-test"; // Define the resource group name
 const tenantId = 'cb0bb315-f38b-4ab4-ad2d-d3ed25d23b53';
-const subscriptionId = '48b9d140-b453-4053-9fe1-a46509808c7f';
+const subscriptionId = '998590b9-1c43-452a-9b02-dcf9ed5acb64';
 
 function formatName(type: string, name: string, env: string, sanitize: boolean = false): string {
   const formattedName = `${type}-${name}-${env}`;
@@ -57,7 +61,9 @@ class DboteStack extends TerraformStack {
       sku: 'developer',
     });
 
-    // Deploy BasicIdentityProvider (with in-memory client storage)
+    // Deploy BasicIdentityProvider. Its client registry is shared across instances via Table Storage
+    // (configured in the construct) so a client that registers on one instance can obtain a token
+    // from another (Flex Consumption).
     const identityProvider = new DboteIdentityProvider(this, environment, insights.connection);
 
     const worker = new DboteWorker(this, environment, appConfiguration.endpoint, insights.connection);
@@ -67,7 +73,7 @@ class DboteStack extends TerraformStack {
 
     identityProvider.addAppSetting('BasicIdentityProvider__Audience', audience);
 
-    const benchmark = new DboteBenchmark(this, environment, appConfiguration.endpoint, insights.connection);
+    // const benchmark = new DboteBenchmark(this, environment, appConfiguration.endpoint, insights.connection);
 
     // Service Bus
     const serviceBusNamespaceName = formatName('sbns', 'dbote', 'cmdev', false);
@@ -191,6 +197,27 @@ class DboteStack extends TerraformStack {
       }],
     });
 
+    // Load-test cloud side: a single consolidator/dashboard web app, and the horizontally scalable
+    // controller as a Container App that scales on the cloud queue's backlog (KEDA).
+    const ltDashboard = new DboteLoadTestDashboard(this, environment, {
+      serviceBusConnectionString: serviceBusNamespace.defaultPrimaryConnectionString,
+      storageConnectionString: storageAccount.primaryConnectionString,
+      cloudQueue: cloudQueue.name,
+      clientsQueue: clientsQueue.name,
+      appInsightsConnection: insights.connection,
+    });
+
+    new DboteLoadTestController(this, environment, {
+      serviceBusConnectionString: serviceBusNamespace.defaultPrimaryConnectionString,
+      serviceBusNamespaceName: serviceBusNamespace.name,
+      storageConnectionString: storageAccount.primaryConnectionString,
+      cloudQueue: cloudQueue.name,
+      clientsQueue: clientsQueue.name,
+      errorQueue: errorQueue.name,
+      appInsightsConnection: insights.connection,
+      consolidatorUrl: ltDashboard.url,
+    });
+
     // role assignments - worker
     new RoleAssignment(this, environment.formatName('role', 'func-sbns'), {
       scope: serviceBusNamespace.id,
@@ -311,7 +338,8 @@ class DboteStack extends TerraformStack {
     });
 */
 
-    // role assignments - benchmark cloud
+    // role assignments - benchmark cloud (skipped with the benchmark)
+    /*
     new RoleAssignment(this, environment.formatName('role', 'app-cloud-sbns'), {
       scope: serviceBusNamespace.id,
       roleDefinitionName: 'Azure Service Bus Data Owner',
@@ -323,6 +351,7 @@ class DboteStack extends TerraformStack {
       roleDefinitionName: 'App Configuration Data Reader',
       principalId: benchmark.cloudPrincipalId,
     });
+    */
 
 
     // app config - benchmark cloud
@@ -375,7 +404,8 @@ class DboteStack extends TerraformStack {
       label: environment.environment,
     });
 
-    // role assignments - benchmark service
+    // role assignments - benchmark service (skipped with the benchmark)
+    /*
     new RoleAssignment(this, environment.formatName('role', 'app-service-sbns'), {
       scope: serviceBusNamespace.id,
       roleDefinitionName: 'Azure Service Bus Data Owner',
@@ -387,6 +417,7 @@ class DboteStack extends TerraformStack {
       roleDefinitionName: 'App Configuration Data Reader',
       principalId: benchmark.servicePrincipalId,
     });
+    */
 
     // app config - benchmark service
     new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-namespace'), {
@@ -431,7 +462,7 @@ const stack = new DboteStack(app, "infra");
 
 new AzurermBackend(stack, {
   resourceGroupName: 'rg-dbote-test',
-  storageAccountName: 'stdbotestfstate',
+  storageAccountName: 'stdbotetfstatesp',
   containerName: 'tfstate',
   key: 'dbote.tfstate',
 });

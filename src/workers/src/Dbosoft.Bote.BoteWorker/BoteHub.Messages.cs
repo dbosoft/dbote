@@ -4,6 +4,7 @@ using Dbosoft.Bote.Primitives;
 using Dbosoft.Bote.Transport.Abstractions;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.Text.Json;
 using Azure.Storage.Blobs;
 
@@ -34,6 +35,7 @@ internal partial class BoteHub
         string queue,
         BoteMessage message)
     {
+        var inboundStart = Stopwatch.GetTimestamp();
         var tenantId = ExtractTenantId(invocationContext);
         var clientId = ExtractClientId(invocationContext);
 
@@ -69,7 +71,9 @@ internal partial class BoteHub
                 $"Attempted to set disallowed header(s): {string.Join(", ", disallowedHeaders)}");
         }
 
+        var tsb = Stopwatch.GetTimestamp();
         var serviceBusMessage = messageConverter.ToServiceBus(message);
+        workerMetrics.InToServiceBus.Record(WorkerMetrics.MsSince(tsb));
 
         // Add authenticated tenant/client identity to message properties
         serviceBusMessage.ApplicationProperties.Add(BoteHeaders.TenantId, tenantId);
@@ -112,10 +116,10 @@ internal partial class BoteHub
         if (sasUri != null)
             serviceBusMessage.ApplicationProperties[BoteHeaders.DataBusInboxSas] = sasUri.ToString();
 
-        await using var serviceBusSender = serviceBusClient.CreateSender(targetQueueName);
-        await serviceBusSender.SendMessageAsync(serviceBusMessage);
-
-
+        var asb = Stopwatch.GetTimestamp();
+        await senderCache.GetSender(targetQueueName).SendMessageAsync(serviceBusMessage);
+        workerMetrics.InAsbSend.Record(WorkerMetrics.MsSince(asb));
+        workerMetrics.InTotal.Record(WorkerMetrics.MsSince(inboundStart));
     }
 
 
@@ -175,7 +179,9 @@ internal partial class BoteHub
         }
 
         // Forward message to client (remove internal tracking headers)
+        var tb = Stopwatch.GetTimestamp();
         var boteMsg = messageConverter.ToBote(message);
+        workerMetrics.OutToBote.Record(WorkerMetrics.MsSince(tb));
         boteMsg.Headers.Remove(BoteHeaders.AttachmentId);
         boteMsg.Headers.Remove(BoteHeaders.ReScheduleCounter);
 
@@ -270,9 +276,8 @@ internal partial class BoteHub
         if(sasUri!= null)
             readyMessage.ApplicationProperties[BoteHeaders.DataBusInboxSas] = sasUri.ToString();
 
-        await using var serviceBusSender = serviceBusClient.CreateSender(
-            serviceBusOptions.Value.Queues.Cloud);
-        await serviceBusSender.SendMessageAsync(readyMessage);
+        await senderCache.GetSender(serviceBusOptions.Value.Queues.Cloud)
+            .SendMessageAsync(readyMessage);
         await messageActions.CompleteMessageAsync(message);
     }
 
@@ -332,9 +337,8 @@ internal partial class BoteHub
             rescheduleCounter++;
             newMessage.ApplicationProperties[BoteHeaders.ReScheduleCounter] = rescheduleCounter;
 
-            await using var sender = serviceBusClient.CreateSender(queueName);
-
-            await sender.ScheduleMessageAsync(newMessage, DateTimeOffset.UtcNow.AddSeconds(delay));
+            await senderCache.GetSender(queueName)
+                .ScheduleMessageAsync(newMessage, DateTimeOffset.UtcNow.AddSeconds(delay));
             await messageActions.CompleteMessageAsync(message);
 
             logger.LogInformation("Queue {Queue}: Reschedule Message {MessageId} with delay {Delay}",
@@ -362,20 +366,31 @@ internal partial class BoteHub
         logger.LogInformation("Forwarding message to tenant/client {TenantId}/{ClientId}",
             tenantId, clientId);
 
+        var fwdStart = Stopwatch.GetTimestamp();
         var queueClient = await tenantStorageResolver.ResolveQueueClient(tenantId, clientId);
-        var payload = JsonSerializer.Serialize(boteMessage);
+        var ser = Stopwatch.GetTimestamp();
+        // Serialize the envelope straight into a pooled UTF-8 buffer (no intermediate payload
+        // string, no separate GetByteCount pass - the written length is the byte count).
+        using var buffer = new PooledByteBufferWriter(boteMessage.Body.Length + 256);
+        using (var writer = new Utf8JsonWriter(buffer))
+            JsonSerializer.Serialize(writer, boteMessage);
+        workerMetrics.OutSerialize.Record(WorkerMetrics.MsSince(ser));
 
         // Storage Queue messages are capped at 64 KiB. A too-large message would otherwise
         // fail deep in the send with an opaque storage error; surface a defined error naming
         // the limit and the DataBus (attachment) alternative for large payloads instead.
-        var payloadBytes = System.Text.Encoding.UTF8.GetByteCount(payload);
-        if (payloadBytes > MaxStorageQueueMessageBytes)
+        if (buffer.WrittenCount > MaxStorageQueueMessageBytes)
             throw new InvalidOperationException(
-                $"Message for {tenantId}/{clientId} is {payloadBytes} bytes, exceeding the " +
+                $"Message for {tenantId}/{clientId} is {buffer.WrittenCount} bytes, exceeding the " +
                 $"{MaxStorageQueueMessageBytes}-byte Storage Queue limit. Send large payloads as a " +
                 "DataBus attachment instead of inline.");
 
+        // Wraps the pooled buffer without copying; it stays valid until the send completes
+        // because the 'using' scope outlives the awaits below.
+        var payload = BinaryData.FromBytes(buffer.WrittenMemory);
+
         Azure.Response<Azure.Storage.Queues.Models.SendReceipt> receipt;
+        var send = Stopwatch.GetTimestamp();
         try
         {
             // The client's queue is created at connect time (GetQueueMetadata), so it almost
@@ -388,9 +403,13 @@ internal partial class BoteHub
             await queueClient.CreateIfNotExistsAsync();
             receipt = await queueClient.SendMessageAsync(payload);
         }
+        workerMetrics.OutStorageSend.Record(WorkerMetrics.MsSince(send));
 
         // Notify specific client via SignalR
+        var notify = Stopwatch.GetTimestamp();
         await Clients.User($"{tenantId}-{clientId}").NewMessage(receipt.Value.MessageId);
+        workerMetrics.OutSignalRNotify.Record(WorkerMetrics.MsSince(notify));
+        workerMetrics.OutForwardTotal.Record(WorkerMetrics.MsSince(fwdStart));
     }
 
 }

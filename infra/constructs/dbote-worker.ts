@@ -126,6 +126,14 @@ export class DboteWorker extends Construct {
             principalId: this.functionApp.identity.principalId,
         });
 
+        // The worker uses AzureWebJobsStorage (this account) for the databus-copy-monitor queue
+        // trigger and its named QueueServiceClient, so the identity needs queue data access here.
+        new RoleAssignment(this, environment.formatName('role', 'func-st-queue'), {
+            scope: functionStorageAccount.id,
+            roleDefinitionName: 'Storage Queue Data Contributor',
+            principalId: this.functionApp.identity.principalId,
+        });
+
         new RoleAssignment(this, environment.formatName('role', 'func-kv'),{
             scope: functionKeyVault.id,
             roleDefinitionName: 'Key Vault Secrets Officer',

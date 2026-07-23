@@ -41,6 +41,10 @@ export class DboteInsights extends Construct {
     // wait for 10 minutes until Azure has created the smart detection rule in the background
     // and then disable it. We instead just create a rule with the same name as Azure would use.
     // This prevents the generation of the alert rule and action group by Azure.
+    // NOTE: disabled for this environment - Azure already auto-created the rule (the AlertsManagement
+    // provider was registered after the App Insights resource), so managing it here conflicts with
+    // the pre-existing one ("already exists"). The auto-created rule is harmless for test infra.
+    /*
     new MonitorSmartDetectorAlertRule(this, environment.formatName('alert'), {
       name: `Failure Anomalies - ${this.applicationInsights.name}`,
       resourceGroupName: environment.resourceGroup,
@@ -53,6 +57,7 @@ export class DboteInsights extends Construct {
         ids: [],
       },
     })
+    */
   }
 
   get connection(): string {
