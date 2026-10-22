@@ -4,6 +4,7 @@ using Dbosoft.Bote.BoteWorker;
 using Dbosoft.Bote.BoteWorker.Converters;
 using Dbosoft.Bote.BoteWorker.Services;
 using Dbosoft.Bote.Options;
+using Dbosoft.Bote.Primitives;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.Azure;
@@ -35,7 +36,11 @@ builder.Services.AddLogging(loggingBuilder =>
 
 builder.Services.Configure<ServiceBusOptions>(builder.Configuration.GetSection("dbote:Worker:ServiceBus"));
 builder.Services.Configure<OpenIdOptions>(builder.Configuration.GetSection("dbote:Worker:OpenId"));
-builder.Services.Configure<ClientStorageOptions>(builder.Configuration.GetSection("dbote:Worker:Storage"));
+builder.Services.AddOptions<ClientStorageOptions>()
+    .Bind(builder.Configuration.GetSection("dbote:Worker:Storage"))
+    // The client queue names start with it; a bad prefix would only fail at the first client.
+    .Validate(o => { BoteClientNames.ValidatePrefix(o.Prefix); return true; })
+    .ValidateOnStart();
 
 builder.Services.AddServerlessHub<BoteHub>();
 

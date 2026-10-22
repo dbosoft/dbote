@@ -20,8 +20,12 @@ namespace Dbosoft.Bote.BoteWorker
                 topic, tenantId);
 
 
+            // The partition key is tenant-specific already; the tenant check keeps a row that got
+            // into the wrong partition from delivering to another tenant's clients.
             var subscribers = subscriptionsTable.Query<TableEntity>(
-                filter: $"PartitionKey eq '{partitionKey}'").ToList();
+                    filter: TableClient.CreateQueryFilter($"PartitionKey eq {partitionKey}"))
+                .Where(s => s.GetString("TenantId") == tenantId)
+                .ToList();
 
             // Fan out in parallel with per-subscriber failure isolation: one slow or failing
             // subscriber must not block the others (head-of-line) or abort the whole broadcast.
@@ -103,7 +107,7 @@ namespace Dbosoft.Bote.BoteWorker
                 await subscriptionsTable.CreateIfNotExistsAsync();
 
                 var partitionKey = SubscriptionKeyFormatter.CreatePartitionKey(tenantId, topicName);
-                var rowKey = SubscriptionKeyFormatter.CreateRowKey(clientId);
+                var rowKey = SubscriptionKeyFormatter.CreateRowKey(tenantId, clientId);
 
                 var entity = new TableEntity(partitionKey, rowKey)
                 {
@@ -145,7 +149,7 @@ namespace Dbosoft.Bote.BoteWorker
             // Remove subscription from table storage
             var subscriptionsTable = tableServiceClient.GetTableClient(SubscriptionsTableName);
             var partitionKey = SubscriptionKeyFormatter.CreatePartitionKey(tenantId, topicName);
-            var rowKey = SubscriptionKeyFormatter.CreateRowKey(clientId);
+            var rowKey = SubscriptionKeyFormatter.CreateRowKey(tenantId, clientId);
 
             try
             {

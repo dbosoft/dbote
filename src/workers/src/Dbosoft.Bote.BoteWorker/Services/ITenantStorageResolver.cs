@@ -14,8 +14,14 @@ public interface ITenantStorageResolver
     ValueTask<(BlobServiceClient Storage, string Container)> ResolveClientDataStore(string tenantId);
 
     /// <summary>
-    /// Resolves tenant's queue client
+    /// Resolves the storage queue a client receives on. Name it after
+    /// <see cref="Dbosoft.Bote.Primitives.BoteClientNames"/>, so no two clients share one.
     /// </summary>
-    ValueTask<QueueClient> ResolveQueueClient(string tenantId, string id);
+    ValueTask<QueueClient> ResolveQueueClient(string tenantId, string clientId);
+
+    /// <summary>
+    /// Resolves the storage queue a client moves its poison messages to.
+    /// </summary>
+    ValueTask<QueueClient> ResolveErrorQueueClient(string tenantId, string clientId);
 
 }

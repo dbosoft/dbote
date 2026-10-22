@@ -410,7 +410,7 @@ internal partial class BoteHub
 
         // Notify specific client via SignalR
         var notify = Stopwatch.GetTimestamp();
-        await Clients.User($"{tenantId}-{clientId}").NewMessage(receipt.Value.MessageId);
+        await Clients.User(BoteClientNames.SignalRUserId(tenantId, clientId)).NewMessage(receipt.Value.MessageId);
         workerMetrics.OutSignalRNotify.Record(WorkerMetrics.MsSince(notify));
         workerMetrics.OutForwardTotal.Record(WorkerMetrics.MsSince(fwdStart));
     }

@@ -81,7 +81,7 @@ bote creates a **security and abstraction boundary** between internal cloud arch
 
 - **Azure Storage Queues**: HTTPS-accessible queues with SAS token authentication
 - **Custom Rebus Transport**: Eliminates wasteful polling via SignalR push notifications
-- **Queues**: `bote-{tenantId}-{clientId}` (one per tenant-client, dynamically created)
+- **Queues**: `bote-{key}`, key = hash of tenant and client (one per tenant-client, dynamically created; see `BoteClientNames`)
 
 **How it Works**:
 1. **SignalR Push**: Worker sends instant notification when message arrives
@@ -102,7 +102,7 @@ bote creates a **security and abstraction boundary** between internal cloud arch
 1. **Authentication**: Validates client JWT tokens (OAuth 2.0 Client Credentials flow with ECDSA-signed client assertions)
 2. **Identity Injection**: Adds trusted `TenantId` + `ClientId` headers (clients cannot spoof these - see `Messages.cs:254-267`)
 3. **Message Routing**:
-   - **Targeted**: Routes to specific client queue (`bote-{tenant}-{client}`)
+   - **Targeted**: Routes to specific client queue (`bote-{key}`)
    - **Broadcast**: Routes to all clients subscribed to a topic within a tenant
 4. **Isolation**: Ensures tenants cannot access each other's messages
 5. **SignalR Notifications**: Sends push notifications to active clients
@@ -128,7 +128,7 @@ bote creates a **security and abstraction boundary** between internal cloud arch
 
 **Created on tenant onboarding:**
 
-- **Storage Queues**: `bote-{tenantId}-{clientId}` (created on-demand, pennies per month)
+- **Storage Queues**: `bote-{key}` per client (created on-demand, pennies per month)
 - **Table Storage**: Subscription entries for topic broadcasts
 - **Identity Provider**: Client registrations (public keys)
 
@@ -211,7 +211,7 @@ await bus.Send(new ResponseMessage(), new Dictionary<string, string>()
 
 **Flow**:
 1. Cloud sends to `bote-clients` queue
-2. BoteWorker routes to `bote-{tenantId}-{clientId}` Storage Queue
+2. BoteWorker routes to the client's Storage Queue (`bote-{key}`)
 3. SignalR notifies specific client
 4. Client polls queue and receives message
 
@@ -611,7 +611,7 @@ public async Task ProcessJob(
 
 2. **Default injected `QueueServiceClient`** (from line 52 in Program.cs):
    - For **application data queues** NOT monitored by triggers
-   - Examples: `bote-{tenant}-{client}` message queues
+   - Examples: `bote-{key}` client message queues
    - **No Base64 encoding** (default encoding)
    - Uses `dbote:Worker:Storage:Connection` configuration
    - Never use this for queues with `[QueueTrigger]` - encoding mismatch!

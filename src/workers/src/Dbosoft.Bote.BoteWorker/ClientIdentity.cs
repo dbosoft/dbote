@@ -14,6 +14,11 @@ public record ClientIdentity(string TenantId, string ClientId)
     /// <param name="token">The validated JWT token</param>
     /// <param name="identity">The extracted identity if successful</param>
     /// <returns>True if identity was successfully extracted</returns>
+    /// <remarks>
+    /// The tenant names a folder of the DataBus containers (<c>{tenant}/{attachment}</c>), so
+    /// tenant and client must work as a path segment: no slashes, no control characters, not
+    /// <c>.</c> or <c>..</c>.
+    /// </remarks>
     public static bool TryExtract(JsonWebToken token, out ClientIdentity? identity)
     {
         identity = null;
@@ -26,7 +31,13 @@ public record ClientIdentity(string TenantId, string ClientId)
         if (!token.TryGetValue("tid", out string tenantId) || string.IsNullOrEmpty(tenantId))
             return false;
 
+        if (!IsPathSegment(tenantId) || !IsPathSegment(clientId))
+            return false;
+
         identity = new ClientIdentity(tenantId, clientId);
         return true;
     }
+
+    private static bool IsPathSegment(string id) =>
+        id is not ("." or "..") && !id.Any(c => c is '/' or '\\' || char.IsControl(c));
 }

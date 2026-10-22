@@ -66,6 +66,29 @@ public class NegotiateAuthorizerTests
     }
 
     [Theory]
+    [InlineData("tenant/a", "client-a")]
+    [InlineData("..", "client-a")]
+    [InlineData("tenant-a", "client\\a")]
+    [InlineData("tenant-a", ".")]
+    [InlineData("tenant-a", "client\na")]
+    public async Task Refuses_ids_that_are_no_path_segment(string tenantId, string clientId)
+    {
+        var decision = await Authorize($"Bearer {_idp.Issue(tenantId: tenantId, clientId: clientId)}");
+
+        decision.Should().Be(NegotiateDecision.Deny(HttpStatusCode.Unauthorized));
+    }
+
+    [Theory]
+    [InlineData("a-b", "c-error")]
+    [InlineData("3f2c9a52-6f0e-4a8e-9a3b-0f5d2c7e1b44", "Client A.1")]
+    public async Task Accepts_ids_the_names_no_longer_depend_on(string tenantId, string clientId)
+    {
+        var decision = await Authorize($"Bearer {_idp.Issue(tenantId: tenantId, clientId: clientId)}");
+
+        decision.Identity.Should().Be(new ClientIdentity(tenantId, clientId));
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("other")]
     [InlineData("bote other")]

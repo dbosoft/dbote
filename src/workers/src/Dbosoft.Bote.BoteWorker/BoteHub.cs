@@ -6,6 +6,7 @@ using Dbosoft.Bote.Abstractions.SignalR;
 using Dbosoft.Bote.BoteWorker.Converters;
 using Dbosoft.Bote.BoteWorker.Services;
 using Dbosoft.Bote.Options;
+using Dbosoft.Bote.Primitives;
 using Dbosoft.Bote.Transport.Abstractions;
 using JetBrains.Annotations;
 using Microsoft.Azure.Functions.Worker;
@@ -64,7 +65,7 @@ internal partial class BoteHub(
 
         var negotiateResponse = await NegotiateAsync(new NegotiationOptions
         {
-            UserId = $"{identity.TenantId}-{identity.ClientId}",
+            UserId = BoteClientNames.SignalRUserId(identity.TenantId, identity.ClientId),
             Claims =
             [
                 new Claim(ClaimNames.TenantId, identity.TenantId),
@@ -110,7 +111,7 @@ internal partial class BoteHub(
 
     /// <summary>
     /// Issues a write-only SAS for the client's local dead-letter queue
-    /// (<c>{prefix}-{tenant}-{client}-error</c>). Clients move poison messages here
+    /// (<see cref="BoteClientNames.ClientErrorQueueName"/>). Clients move poison messages here
     /// directly, so the edge keeps its own failures instead of routing them through
     /// the <see cref="SendMessage"/> whitelist (which only accepts the cloud/clients
     /// queues and would reject the error queue).
@@ -127,7 +128,7 @@ internal partial class BoteHub(
         var tenantId = ExtractTenantId(invocationContext);
         var clientId = ExtractClientId(invocationContext);
 
-        var queueClient = await tenantStorageResolver.ResolveQueueClient(tenantId, $"{clientId}-error");
+        var queueClient = await tenantStorageResolver.ResolveErrorQueueClient(tenantId, clientId);
         await queueClient.CreateIfNotExistsAsync();
         var uri = queueClient.GenerateSasUri(
             QueueSasPermissions.Add,

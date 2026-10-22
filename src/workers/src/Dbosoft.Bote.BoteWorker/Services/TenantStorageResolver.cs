@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Azure.Storage.Blobs;
 using Azure.Storage.Queues;
 using Dbosoft.Bote.Options;
+using Dbosoft.Bote.Primitives;
 using Microsoft.Extensions.Options;
 
 namespace Dbosoft.Bote.BoteWorker.Services;
@@ -22,11 +23,13 @@ public class DefaultTenantStorageResolver(IOptions<ClientStorageOptions> options
     public ValueTask<(BlobServiceClient, string)> ResolveClientDataStore(string tenantId) =>
         ValueTask.FromResult((_blobServiceClient.Value, $"{options.Value.Prefix}-ds"));
 
-    public ValueTask<QueueClient> ResolveQueueClient(string tenantId, string id)
-    {
-        var queueName = $"{options.Value.Prefix}-{tenantId}-{id}";
-        var client = _queueClients.GetOrAdd(queueName,
-            name => new QueueClient(options.Value.Connection, name));
-        return new ValueTask<QueueClient>(client);
-    }
+    public ValueTask<QueueClient> ResolveQueueClient(string tenantId, string clientId) =>
+        GetQueueClient(BoteClientNames.ClientQueueName(options.Value.Prefix, tenantId, clientId));
+
+    public ValueTask<QueueClient> ResolveErrorQueueClient(string tenantId, string clientId) =>
+        GetQueueClient(BoteClientNames.ClientErrorQueueName(options.Value.Prefix, tenantId, clientId));
+
+    private ValueTask<QueueClient> GetQueueClient(string queueName) =>
+        ValueTask.FromResult(_queueClients.GetOrAdd(queueName,
+            name => new QueueClient(options.Value.Connection, name)));
 }

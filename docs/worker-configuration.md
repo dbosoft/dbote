@@ -18,8 +18,8 @@ Product)"**:
 - **One application (SaaS product) = one worker deployment**, with its **own**
   Service Bus namespace, Storage account, Azure SignalR service and identity
   provider. Every `dbote:Worker:*` key below points at *that* product's resources.
-- **Multi-tenancy happens *inside* one deployment** via per-tenant queues
-  (`{Storage:Prefix}-{tenantId}-{clientId}`), created on demand.
+- **Multi-tenancy happens *inside* one deployment** via per-client queues
+  (`{Storage:Prefix}-{key}`, see [Client names](#client-names)), created on demand.
 - Nothing is shared across applications, so the worker's **fixed** resource names
   (see [Fixed names](#fixed-names-not-configurable)) never collide between
   applications — each product has its own storage account and namespace.
@@ -97,7 +97,7 @@ Every key here points at the adopting application's **own** resources.
 | Key | Required | Meaning |
 | --- | --- | --- |
 | `…:Connection` | yes | Storage account for the data planes the worker uses: per-tenant **queues**, subscription **table**, and DataBus **blob** containers. Also the connection of the `CloudOutboxBlobDetected` blob trigger on `bote-outbox`, so the cloud side stages outgoing attachments here. With a managed identity, set `…:Connection:blobServiceUri`, `…:Connection:queueServiceUri` and `…:Connection:tableServiceUri` (the blob trigger does not read `serviceUri`) and give the identity Storage Blob Data Owner; not yet run in Azure, the reference infra passes a connection string. |
-| `…:Prefix` | no (default `bote`) | Prefix for per-tenant queue names → `{Prefix}-{tenantId}-{clientId}` (+ `-error`). Use a distinct prefix if several deployments ever share one account. |
+| `…:Prefix` | no (default `bote`) | Prefix of the client queue names → `{Prefix}-{key}` (+ `-error`). Lowercase letters, digits and single hyphens, at most 24 characters; checked at startup. Use a distinct prefix if several deployments ever share one account. |
 
 ### SignalR (`dbote:Worker:SignalR`)
 
@@ -130,7 +130,24 @@ Safe to hardcode because of the one-deployment-per-application isolation model:
 | --- | --- | --- |
 | `databus-copy-monitor` | `AzureWebJobsStorage` queue | Blob-copy monitor queue trigger (Base64). |
 | `bote-outbox` / `bote-inbox` | `Storage:Connection` blob containers | DataBus claim-check staging (`BoteStorageConstants`). Create them with the account: the outbox blob trigger needs its container from the start. |
-| `{Storage:Prefix}-{tenantId}-{clientId}` (+ `-error`) | `Storage:Connection` queues | Per-tenant client queues, created on demand. |
+| `{Storage:Prefix}-{key}` (+ `-error`) | `Storage:Connection` queues | Per-client queues, created on demand. |
+
+## Client names
+
+Everything the worker keeps per client is named after a key, not after the ids joined together
+(`BoteClientNames` in `Dbosoft.Bote.Primitives`):
+
+- **key** = the first 128 bits of SHA-256 over the tenant id (length-prefixed) and the client id,
+  as 32 lowercase hex characters. Joining the ids with `-` let `a-b`/`c` and `a`/`b-c` share a
+  queue, and a client named `c-error` read the error queue of `c`; a hash also fits any ids
+  (GUIDs included) into the 63 characters of a queue name.
+- client queue `{Prefix}-{key}`, its error queue `{Prefix}-{key}-error`, SignalR user `{key}`,
+  subscriptions table partition = key of tenant and topic, row = key of the client.
+- Tenant and client ids must not contain `/`, `\` or control characters, nor be `.` or `..`:
+  the tenant also names the DataBus folder `{tenant}/{attachment}`. The worker refuses other ids
+  at negotiate.
+- The names are opaque; to find a client's queue, compute `BoteClientNames.ClientQueueName`.
+  Changing the scheme orphans every client's queue and subscriptions (`The_key_is_stable` pins it).
 
 ## Managed identity
 
