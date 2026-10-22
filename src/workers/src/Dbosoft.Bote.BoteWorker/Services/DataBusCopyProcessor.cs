@@ -52,6 +52,10 @@ public class DataBusCopyProcessor(
 
         if (destProps != null)
         {
+            // Another client's attachment under the same id is not this copy done already.
+            if (PeerAttachments.IsPeerCopy(destProps.Metadata))
+                throw new InvalidOperationException($"Attachment {request.AttachmentId} already exists.");
+
             switch (CheckBlobCopyState(destProps))
             {
                 case BlobCopyState.Failed:

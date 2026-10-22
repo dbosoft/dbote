@@ -25,7 +25,7 @@ public class ClientRegistration(
         }
 
         client.Scopes ??= [];
-        if (client.Scopes.Any(s => string.IsNullOrWhiteSpace(s) || s.Contains(' ')))
+        if (client.Scopes.Any(s => string.IsNullOrWhiteSpace(s) || s.Any(char.IsWhiteSpace)))
             return new BadRequestObjectResult(new { error = "A scope is a single word." });
 
         await clientRepository.Register(client);

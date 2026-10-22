@@ -12,8 +12,7 @@ namespace Dbosoft.Bote.BoteWorker;
 
 internal partial class BoteHub
 {
-    // Azure Storage Queue hard limit for a single message payload (64 KiB).
-    private const int MaxStorageQueueMessageBytes = 64 * 1024;
+    private const int MaxStorageQueueMessageBytes = ClientSendRules.MaxStorageQueueMessageBytes;
 
     /// <summary>
     /// Message from client to be sent to Service Bus queue.
@@ -53,6 +52,8 @@ internal partial class BoteHub
             throw new UnauthorizedAccessException($"Queue '{queue}' is not allowed");
         }
 
+        ClientSendRules.NormalizeHeaderNames(message.Headers);
+
         // Validate headers against the trust-boundary allow-list - REJECT if the client
         // tries to set any worker-controlled dbote-* header (identity, routing, inbox SAS,
         // retry tracking). Only dbote-attachment-id and non-dbote headers are permitted.
@@ -69,20 +70,26 @@ internal partial class BoteHub
         var serviceBusMessage = messageConverter.ToServiceBus(message);
         workerMetrics.InToServiceBus.Record(WorkerMetrics.MsSince(tsb));
 
-        // The tenant is always the sender's. For the cloud the client id names the sender; on
-        // the clients queue it names the receiver, and a message to a peer names its sender
-        // apart, set here from the token - whatever the client put there.
-        serviceBusMessage.ApplicationProperties[BoteHeaders.TenantId] = tenantId;
-        serviceBusMessage.ApplicationProperties[BoteHeaders.ClientId] = route.ClientId ?? clientId;
-        switch (route.Target)
+        if (ClientSendRules.Refuse(message, serviceBusMessage, route, DateTimeOffset.UtcNow) is { } refusal)
         {
-            case ClientSendTarget.Peer:
-                serviceBusMessage.ApplicationProperties[BoteHeaders.SenderClientId] = clientId;
-                break;
-            case ClientSendTarget.Cloud:
-                serviceBusMessage.ApplicationProperties.Remove(BoteHeaders.SenderClientId);
-                break;
-            // Self: a deferred message keeps the sender of the message it was made from.
+            logger.LogWarning("Refused message of {TenantId}/{ClientId} to {Queue}: {Reason}",
+                tenantId, clientId, queue, refusal);
+            throw new InvalidOperationException(refusal);
+        }
+
+        ClientSendRules.Stamp(serviceBusMessage.ApplicationProperties, tenantId, clientId, route,
+            serviceBusOptions.Value.Queues.Clients);
+
+        if (route.Target == ClientSendTarget.Peer)
+        {
+            // Only to a client that has connected once (its queue is made then), so a client
+            // cannot have the worker make queues for any name it likes.
+            var receiverQueue = await tenantStorageResolver.ResolveQueueClient(tenantId, route.ClientId!);
+            if (!(await receiverQueue.ExistsAsync()).Value)
+                throw new InvalidOperationException($"Client '{route.ClientId}' is not known.");
+
+            logger.LogInformation("Client {TenantId}/{ClientId} sends {MessageId} to {Receiver}",
+                tenantId, clientId, serviceBusMessage.MessageId, route.ClientId);
         }
 
         // Messages to clients - itself or a peer - go through the clients queue, which delivers
@@ -180,7 +187,7 @@ internal partial class BoteHub
                         {
                             ["Reason"] = "Attachment copy failed"
                         });
-                    break;
+                    return;
                 case AttachmentState.Ready:
                     // fall through to forwarding logic
                     break;
@@ -220,7 +227,9 @@ internal partial class BoteHub
         }
         else if (message.ApplicationProperties.TryGetValue(BoteHeaders.ClientId, out var msgClientId))
         {
-            await ForwardToClientQueue(tenantId, msgClientId.ToString()!, boteMsg);
+            // A message from a peer only goes to a queue that exists; see SendMessage.
+            await ForwardToClientQueue(tenantId, msgClientId.ToString()!, boteMsg,
+                StorageTimeToLive(message), createQueue: senderClientId is null);
         }
         else
         {
@@ -272,7 +281,7 @@ internal partial class BoteHub
                             {
                                 ["Reason"] = "Attachment copy failed"
                             });
-                    break;
+                    return;
                 case AttachmentState.Ready when isPeerMessage:
                     await DeliverPeerAttachment(container, inboxPath, tenantId, senderClientId, attachmentId);
                     break;
@@ -400,7 +409,21 @@ internal partial class BoteHub
         }
     }
 
-    private async Task ForwardToClientQueue(string tenantId, string clientId, BoteMessage boteMessage)
+    /// <summary>
+    /// What is left of the message's time to live, for the storage queue it waits in next; a
+    /// request to a client that is offline should not run days later. <c>null</c>: the queue's
+    /// default (7 days).
+    /// </summary>
+    private static TimeSpan? StorageTimeToLive(ServiceBusReceivedMessage message)
+    {
+        if (message.TimeToLive >= TimeSpan.FromDays(7))
+            return null;
+        var left = message.ExpiresAt - DateTimeOffset.UtcNow;
+        return left > TimeSpan.FromSeconds(1) ? left : TimeSpan.FromSeconds(1);
+    }
+
+    private async Task ForwardToClientQueue(string tenantId, string clientId, BoteMessage boteMessage,
+        TimeSpan? timeToLive = null, bool createQueue = true)
     {
         logger.LogInformation("Forwarding message to tenant/client {TenantId}/{ClientId}",
             tenantId, clientId);
@@ -435,12 +458,12 @@ internal partial class BoteHub
             // The client's queue is created at connect time (GetQueueMetadata), so it almost
             // always exists here. Send optimistically and create only on the rare 404 miss,
             // instead of a create round-trip on every delivery (incl. every broadcast subscriber).
-            receipt = await queueClient.SendMessageAsync(payload);
+            receipt = await queueClient.SendMessageAsync(payload, timeToLive: timeToLive);
         }
-        catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+        catch (Azure.RequestFailedException ex) when (ex.Status == 404 && createQueue)
         {
             await queueClient.CreateIfNotExistsAsync();
-            receipt = await queueClient.SendMessageAsync(payload);
+            receipt = await queueClient.SendMessageAsync(payload, timeToLive: timeToLive);
         }
         workerMetrics.OutStorageSend.Record(WorkerMetrics.MsSince(send));
 

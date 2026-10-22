@@ -12,6 +12,11 @@ internal class BoteOutgoingValidationsStep(string clientsQueue) : IOutgoingStep
     {
         var outgoingMessage = context.Load<TransportMessage>();
 
+        // Only the worker names the sender of a message from another client; from the cloud it
+        // would make the client take the cloud's message for a peer's.
+        if (outgoingMessage.Headers.Keys.Any(k => k.Equals(BoteHeaders.SenderClientId, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException($"The cloud cannot set {BoteHeaders.SenderClientId}.");
+
         // Skip client validation for topic broadcasts
         if (outgoingMessage.Headers.ContainsKey(BoteHeaders.Topic))
         {

@@ -45,7 +45,7 @@ internal class DataBusOutgoingStep(
             var metadata = await dataBusStorage.ReadMetadata(attachmentId)
                            ?? new Dictionary<string, string>();
 
-            var outboxPath = $"{tenantId}/{attachmentId}";
+            var outboxPath = $"{tenantId}/{BoteAttachmentIds.Validate(attachmentId)}";
 
             var outboxBlob = blobServiceClient.GetBlobContainerClient(
                     outboxContainerName)

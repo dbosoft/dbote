@@ -247,7 +247,8 @@ export class DboteGateway extends Construct {
         });
 
         // DataBus containers and the outbox blob trigger (which needs owner with an identity-based
-        // connection). The worker uses the connection string below today; this is for the switch.
+        // connection). Unused while the worker works with the connection string below; kept for
+        // moving its own blob, queue and table calls to the identity.
         new RoleAssignment(this, environment.formatName('role', 'func-stb'), {
             scope: storageAccount.id,
             roleDefinitionName: 'Storage Blob Data Owner',
@@ -256,7 +257,8 @@ export class DboteGateway extends Construct {
 
         // The SignalR and Azure Service Bus configuration cannot be placed in the App
         // Configuration Service as the Azure Function host parses them to set up the triggers.
-        // TODO use managed identity for table and queue storage
+        // A connection string with the account key: the worker signs the SAS URIs for the clients
+        // with it, and Storage Queues have no user delegation SAS.
         worker.addAppSetting('dbote__Worker__Storage__Connection', storageAccount.primaryConnectionString);
         worker.addAppSetting('dbote__Worker__ServiceBus__Connection__fullyQualifiedNamespace', this.fullyQualifiedNamespace);
         worker.addAppSetting('dbote__Worker__ServiceBus__Connection__credential', 'managedidentity');

@@ -26,40 +26,16 @@ namespace Dbosoft.Bote.BoteWorker
         private async Task DeliverPeerAttachment(BlobContainerClient inbox, string inboxPath,
             string tenantId, string senderClientId, string attachmentId)
         {
-            var source = inbox.GetBlobClient(inboxPath);
-            var sourceProperties = await source.GetPropertiesAsync();
-            var senderKey = BoteClientNames.ClientKey(tenantId, senderClientId);
-            var metadata = new Dictionary<string, string>(sourceProperties.Value.Metadata)
-            {
-                [BoteStorageConstants.Metadata.TenantId] = tenantId,
-                [BoteStorageConstants.Metadata.SenderKey] = senderKey,
-            };
-
-            var container = await GetClientBlobContainer(tenantId);
-            var destination = container.GetBlobClient(DataBusPaths.Delivered(tenantId, attachmentId));
-            var sourceUri = source.GenerateSasUri(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(2));
-
             try
             {
-                // Never over what is there: the id is the sender's choice, and the path is the one
-                // the tenant's attachments from the cloud use as well.
-                await destination.StartCopyFromUriAsync(sourceUri, new BlobCopyFromUriOptions
-                {
-                    Metadata = metadata,
-                    DestinationConditions = new BlobRequestConditions { IfNoneMatch = ETag.All },
-                });
+                await PeerAttachments.DeliverAsync(inbox.GetBlobClient(inboxPath),
+                    await GetClientBlobContainer(tenantId), tenantId, senderClientId, attachmentId);
             }
-            catch (RequestFailedException ex) when (ex.Status is 409 or 412)
+            catch (InvalidOperationException)
             {
-                // A redelivered message copies again; what the first attempt copied is it.
-                var existing = await destination.GetPropertiesAsync();
-                if (!existing.Value.Metadata.TryGetValue(BoteStorageConstants.Metadata.SenderKey, out var key)
-                    || key != senderKey)
-                {
-                    logger.LogWarning("Client {TenantId}/{ClientId} sent attachment {AttachmentId}, whose id is taken",
-                        tenantId, senderClientId, attachmentId);
-                    throw new InvalidOperationException($"Attachment {attachmentId} already exists.");
-                }
+                logger.LogWarning("Client {TenantId}/{ClientId} sent attachment {AttachmentId}, whose id is taken",
+                    tenantId, senderClientId, attachmentId);
+                throw;
             }
         }
 

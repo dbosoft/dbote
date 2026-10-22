@@ -14,6 +14,7 @@ public class DataBusPathsTests
     [InlineData(".")]
     [InlineData("a\\b")]
     [InlineData("a\nb")]
+    [InlineData("x.")]
     [InlineData("")]
     public void Refuses_attachment_ids_that_are_no_path_segment(string attachmentId)
     {
@@ -38,22 +39,31 @@ public class DataBusPathsTests
         // What the worker hands out: the SAS must point into the tenant's folder.
         var container = new BlobContainerClient(new Uri("https://acct.blob.core.windows.net/bote-ds"),
             new StorageSharedKeyCredential("acct", Convert.ToBase64String(new byte[64])));
-        foreach (var path in new[]
-                 {
-                     DataBusPaths.Delivered("tenant-a", attachmentId),
-                     DataBusPaths.Upload("tenant-a", "client-a", attachmentId),
-                 })
-            container.GetBlobClient(path).Name.Should().StartWith("tenant-a/");
+        container.GetBlobClient(DataBusPaths.Delivered("tenant-a", attachmentId)).Name.Should().StartWith("tenant-a/");
+    }
+
+    [Theory]
+    [InlineData("report.pdf")]
+    [InlineData("3F2C9A52-6F0E-4A8E-9A3B")]
+    public void A_client_names_its_uploads_with_guids_only(string attachmentId)
+    {
+        var upload = () => DataBusPaths.Upload("tenant-a", "client-a", attachmentId);
+        var inbox = () => DataBusPaths.Inbox("tenant-a", "client-a", attachmentId);
+
+        upload.Should().Throw<ArgumentException>();
+        inbox.Should().Throw<ArgumentException>();
+        DataBusPaths.Upload("tenant-a", "client-a", "3f2c9a52-6f0e-4a8e-9a3b-0f5d2c7e1b44").Should().StartWith("tenant-a/upload/");
     }
 
     [Fact]
     public void Uploads_lie_apart_from_delivered_attachments_and_per_client()
     {
-        var uploadA = DataBusPaths.Upload("tenant-a", "client-a", "x");
-        var uploadB = DataBusPaths.Upload("tenant-a", "client-b", "x");
+        const string id = "3f2c9a52-6f0e-4a8e-9a3b-0f5d2c7e1b44";
+        var uploadA = DataBusPaths.Upload("tenant-a", "client-a", id);
+        var uploadB = DataBusPaths.Upload("tenant-a", "client-b", id);
 
         uploadA.Should().NotBe(uploadB);
-        uploadA.Should().NotBe(DataBusPaths.Delivered("tenant-a", "x"));
-        DataBusPaths.Inbox("tenant-a", "client-a", "x").Should().NotBe(DataBusPaths.Inbox("tenant-a", "client-b", "x"));
+        uploadA.Should().NotBe(DataBusPaths.Delivered("tenant-a", id));
+        DataBusPaths.Inbox("tenant-a", "client-a", id).Should().NotBe(DataBusPaths.Inbox("tenant-a", "client-b", id));
     }
 }

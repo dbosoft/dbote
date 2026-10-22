@@ -11,11 +11,23 @@ public static class BoteAttachmentIds
 
     public static bool IsValid(string? id) => BoteIds.IsPathSegment(id) && id!.Length <= MaxLength;
 
+    /// <summary>
+    /// The ids a client chooses for what it uploads must be GUIDs, as Rebus makes them: an id
+    /// nobody can guess cannot be read by guessing, nor taken before its sender uses it.
+    /// </summary>
+    public static bool IsValidClientId(string? id) => Guid.TryParseExact(id, "D", out _);
+
+    /// <exception cref="ArgumentException">The id is no GUID.</exception>
+    public static string ValidateClientId(string? id) =>
+        IsValidClientId(id)
+            ? id!
+            : throw new ArgumentException($"'{id}' is not a valid attachment id of a client: a GUID.", nameof(id));
+
     /// <exception cref="ArgumentException">The id is no single path segment.</exception>
     public static string Validate(string? id) =>
         IsValid(id)
             ? id!
             : throw new ArgumentException(
                 $"'{id}' is not a valid attachment id: at most {MaxLength} characters, no '/', '\\', " +
-                "control characters, '.' or '..'.", nameof(id));
+                "control characters, not ending in '.'.", nameof(id));
 }

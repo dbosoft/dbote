@@ -16,15 +16,22 @@ quotas per tenant are the application's business, not missing features of the ga
   (`BoteHeaderPolicy`, an allow-list). A new `dbote-*` header is therefore refused by default;
   keep it that way. `SendMessage` overwrites the sender header with the true sender.
 - Where a client may send is `BoteQueuePolicy`: the cloud queue, its own queue (Rebus defer), and
-  with the peer scope the queue of another client - always within the sender's tenant.
+  with the peer scope the queue of another client that has connected once - always within the
+  sender's tenant. `ClientSendRules` stamps tenant, client, sender and the return address (always
+  the sender's own queue, or a client could have the cloud or a peer answer to someone else) and
+  refuses messages scheduled more than 7 days ahead or too large for a storage queue.
 - Everything the worker keeps per client is named by `BoteClientNames` (hash of tenant and
   client). Never join ids into a name yourself. Never change how the key is derived: it orphans
   every deployed queue and subscription (`The_key_is_stable` pins it).
 - Blob paths go through `DataBusPaths`; every id from outside through `BoteIds.IsPathSegment` /
   `BoteAttachmentIds`. The storage SDK resolves `..` in blob names, so an unchecked id can leave
   the tenant's folder.
-- A client writes only below its own key (`{tenant}/upload/{key}/…`, inbox `{tenant}/{key}/…`).
-  Reading a delivered attachment is tenant-wide by design (broadcasts); that is an accepted risk.
+- A client writes only below its own key (`{tenant}/upload/{key}/…`, inbox `{tenant}/{key}/…`)
+  and only with GUID ids. A peer's attachment and the cloud's share `{tenant}/{id}`; neither copy
+  may take the other's place (`PeerAttachments`, `DataBusCopyProcessor`). Reading a delivered
+  attachment is tenant-wide by design (broadcasts); that is an accepted risk.
+- The storage emulator fails a conditional copy onto an existing blob with an error, not 409/412:
+  look first, keep the condition for the race.
 
 ### Wire format
 

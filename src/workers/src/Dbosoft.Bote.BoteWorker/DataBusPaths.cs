@@ -15,9 +15,9 @@ internal static class DataBusPaths
 
     /// <summary>Client datastore: where a client uploads an attachment for the cloud.</summary>
     public static string Upload(string tenantId, string clientId, string attachmentId) =>
-        $"{tenantId}/upload/{BoteClientNames.ClientKey(tenantId, clientId)}/{BoteAttachmentIds.Validate(attachmentId)}";
+        $"{tenantId}/upload/{BoteClientNames.ClientKey(tenantId, clientId)}/{BoteAttachmentIds.ValidateClientId(attachmentId)}";
 
     /// <summary>Inbox: a client's attachment, copied for the cloud.</summary>
     public static string Inbox(string tenantId, string clientId, string attachmentId) =>
-        $"{tenantId}/{BoteClientNames.ClientKey(tenantId, clientId)}/{BoteAttachmentIds.Validate(attachmentId)}";
+        $"{tenantId}/{BoteClientNames.ClientKey(tenantId, clientId)}/{BoteAttachmentIds.ValidateClientId(attachmentId)}";
 }

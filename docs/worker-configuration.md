@@ -58,7 +58,7 @@ store, so the container app itself carries only the bootstrap settings.
 
 | Setting | Required | Meaning |
 | --- | --- | --- |
-| `Connection` | yes | The gateway storage: the clients' queues, the topic subscriptions table and the attachment containers. The cloud side stages outgoing attachments here as well. With a managed identity: `Connection:blobServiceUri`, `Connection:queueServiceUri` and `Connection:tableServiceUri` (the blob trigger does not read `serviceUri`); this form has not run in Azure yet, the reference deployment uses a connection string. |
+| `Connection` | yes | Connection string of the gateway storage: the clients' queues, the topic subscriptions table and the attachment containers. The cloud side stages outgoing attachments here as well. It has to be a connection string with the account key: the worker signs the SAS URIs it hands to clients with it, and Storage Queues have no SAS a managed identity could sign. |
 | `Prefix` | no, default `bote` | Start of the clients' queue names. Lowercase letters, digits and single hyphens, at most 24 characters; the worker refuses to start otherwise. |
 
 ### SignalR (`dbote:Worker:SignalR`)
@@ -130,7 +130,8 @@ Attachments lie in folders of their tenant:
 | `bote-inbox` | `{tenant}/{key}/{attachment}` | a client's attachments, copied for the cloud |
 | `bote-outbox` | `{tenant}/{attachment}` | what the cloud side stages for its clients |
 
-A client writes only below its own key, so it cannot overwrite another client's attachments. An
+A client writes only below its own key, so it cannot overwrite another client's attachments, and
+names what it uploads with GUIDs (as Rebus does), so nobody can guess an id or take it first. An
 attachment one client sends to another is copied from the sender's inbox copy to `{tenant}/{attachment}`,
 never over an attachment that is already there.
 Attachment ids are checked like tenant ids before they become part of a path.
@@ -142,7 +143,7 @@ What the reference deployment grants the worker's identity:
 | Resource | Role |
 | --- | --- |
 | Service Bus namespace | Azure Service Bus Data Owner |
-| gateway storage | Storage Queue Data Contributor, Storage Table Data Contributor, Storage Blob Data Owner |
+| gateway storage | Storage Queue Data Contributor, Storage Table Data Contributor, Storage Blob Data Owner (not used while the worker has the account key, see above) |
 | Functions host storage | Storage Blob, Queue and Table Data Contributor |
 | the worker's key vault | Key Vault Secrets Officer |
 | SignalR | SignalR Service Owner |
@@ -160,7 +161,41 @@ another tenant, puts the message on the clients queue and delivers it like a mes
 with the sender in `dbote-sender-client-id`. The receiver answers the same way (a Rebus reply goes to
 the sender's queue), so both need the scope. Use it for a client that has to ask another one, e.g. an
 application instance in the cloud that needs a system on the customer's premises through the agent
-there; which client may ask which is up to the receiver, which sees who asks.
+there.
+
+- The receiver decides whom it answers: the worker lets any client with the scope reach any client
+  of its tenant that has connected once, and only names the sender. Check `dbote-sender-client-id`
+  before acting on a request.
+- On a message a client deferred to itself the header is what that client passed on, not
+  confirmed by the worker.
+- A receiver that never connected is refused at the sender; so is a message too large for a
+  storage queue.
+- Answers go to the sender's queue whatever return address the sender wrote.
+- Messages to clients are not deduplicated: a sender that retries after a timeout may deliver
+  twice. Make handlers idempotent on the message id.
+
+## Limits
+
+| | |
+| --- | --- |
+| Message to a client | below 64 KiB as stored (about 45 KiB of payload); larger as an attachment. A client's message to a client above that is refused when sent. |
+| Message to the cloud | the Service Bus limit (256 KiB on Standard). |
+| Scheduling | a client may schedule a message at most 7 days ahead. |
+| Time to live | a message's remaining time to live carries over to the client's storage queue; without one it waits 7 days. |
+| Attachment ids | at most 128 characters and a single path segment; GUIDs for what a client uploads. |
+
+## Upgrading from earlier versions
+
+- Client queues, error queues, SignalR users and subscription rows are named by the hashed key now.
+  Messages still waiting in queues of the old `{prefix}-{tenant}-{client}` form are not delivered
+  any more, and subscriptions are made again when clients subscribe. Drain the old queues before
+  switching, or accept their loss.
+- Attachments: uploads moved below the client's key, so an upload that is under way while the
+  worker is replaced has to be repeated.
+- The worker refuses to start with a queue prefix that is not lowercase letters, digits and single
+  hyphens or is longer than 24 characters, and refuses tokens whose tenant or client id contains
+  `/`, `\` or control characters or ends in a dot.
+- `ITenantStorageResolver` has a separate `ResolveErrorQueueClient`.
 
 ## Setting up a new application
 
