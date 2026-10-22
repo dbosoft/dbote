@@ -78,7 +78,8 @@ as a Key Vault reference, which SignalR resolves with its own identity.
 | `Authority` | yes | Issuer of the client tokens. |
 | `JwksUri` | yes | Where the issuer's signing keys are published. |
 | `Audience` | yes | The audience the tokens must name. |
-| `RequiredScope` | yes | The scope a token must carry, exactly; without it the worker refuses every client. |
+| `RequiredScope` | yes | A scope every token must carry (scopes are a space-separated set); without it the worker refuses every client. |
+| `PeerScope` | no | A client whose token carries this scope too may send to the other clients of its tenant, e.g. `bote.peer`. Unset, clients only talk to the cloud. |
 
 The worker takes the client from `sub` and the tenant from `tid`. It accepts ES256 tokens only,
 reloads the keys when a token names an unknown key (at most every 30 seconds) and keeps using the
@@ -124,12 +125,14 @@ Attachments lie in folders of their tenant:
 
 | Container | Path | What |
 | --- | --- | --- |
-| `{Prefix}-ds` | `{tenant}/{attachment}` | attachments the cloud sent; any client of the tenant may read one whose id it knows |
+| `{Prefix}-ds` | `{tenant}/{attachment}` | attachments sent to clients by the cloud or another client; any client of the tenant may read one whose id it knows |
 | `{Prefix}-ds` | `{tenant}/upload/{key}/{attachment}` | a client's uploads |
 | `bote-inbox` | `{tenant}/{key}/{attachment}` | a client's attachments, copied for the cloud |
 | `bote-outbox` | `{tenant}/{attachment}` | what the cloud side stages for its clients |
 
-A client writes only below its own key, so it cannot overwrite another client's attachments.
+A client writes only below its own key, so it cannot overwrite another client's attachments. An
+attachment one client sends to another is copied from the sender's inbox copy to `{tenant}/{attachment}`,
+never over an attachment that is already there.
 Attachment ids are checked like tenant ids before they become part of a path.
 
 ## Roles for a managed identity
@@ -148,6 +151,16 @@ What the reference deployment grants the worker's identity:
 
 SignalR's own identity needs Key Vault Secrets User on the worker's key vault to resolve the
 upstream URL. The rights the cloud side needs are in [cloud-without-rebus.md](cloud-without-rebus.md).
+
+## Clients talking to each other
+
+With `OpenId:PeerScope` set, a client whose token carries that scope may send to
+`{Queues:Clients}-{otherClientId}`. The worker keeps the sender's tenant, so a client can never reach
+another tenant, puts the message on the clients queue and delivers it like a message from the cloud,
+with the sender in `dbote-sender-client-id`. The receiver answers the same way (a Rebus reply goes to
+the sender's queue), so both need the scope. Use it for a client that has to ask another one, e.g. an
+application instance in the cloud that needs a system on the customer's premises through the agent
+there; which client may ask which is up to the receiver, which sees who asks.
 
 ## Setting up a new application
 

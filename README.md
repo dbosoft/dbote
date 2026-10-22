@@ -3,13 +3,74 @@
 dbosoft bote is a multi-tenant messaging gateway between a cloud application on Azure Service Bus
 and clients on customer premises. The clients only need HTTPS: they receive through Azure Storage
 Queues and are notified through Azure SignalR, so they neither poll empty queues nor need AMQP or a
-VPN. A shared worker (Azure Functions) sits in between as the security boundary: it authenticates
-the clients, sets their verified tenant and client on every message and keeps the tenants apart.
+VPN. A shared worker sits in between as the security boundary: it authenticates the clients, sets
+their verified tenant and client on every message and keeps the tenants apart.
 
 ```
 cloud (Rebus or Azure Functions) ──Service Bus──► BoteWorker ──Storage Queue + SignalR──► client (Rebus)
 cloud ◄──Service Bus── BoteWorker ◄──SignalR── client
 ```
+
+## Architecture
+
+### Parts
+
+- **Cloud side** - the application's own services on Azure Service Bus. Either Rebus endpoints with
+  `.EnableBote()` (`Dbosoft.Bote.Rebus.Integration`) or any other backend, e.g. Azure Functions,
+  with `Dbosoft.Bote.Cloud` ([docs/cloud-without-rebus.md](docs/cloud-without-rebus.md)).
+- **BoteWorker** - an Azure Functions app, run as a container on Azure Container Apps. One generic
+  image; each application deploys it once for all of its tenants
+  ([docs/worker-configuration.md](docs/worker-configuration.md)).
+- **Clients** - Rebus endpoints on customer premises with the bote transport
+  (`Dbosoft.Bote.Rebus`). They reach Azure over HTTPS only: SignalR to send and to be notified,
+  their own Storage Queue to receive.
+- **Identity provider** - the application's own OAuth server. A client proves itself with a JWT
+  signed by its own ECDSA P-256 key and gets an access token naming its tenant (`tid`) and
+  client (`sub`). `BasicIdentityProvider` in this repository is for development only.
+
+### Queues and storage
+
+| | Where | |
+| --- | --- | --- |
+| clients queue | Service Bus | everything the cloud sends to clients, all tenants in one queue |
+| cloud queue | Service Bus | everything clients send, with tenant and client set by the worker |
+| client queue | Storage Queue, one per client | what the worker delivers to that client |
+| subscriptions | Table Storage | which clients of a tenant listen to which topic |
+| attachments | Blob Storage | large payloads (Rebus DataBus) next to the messages |
+
+One Service Bus queue for all clients keeps the worker on a fixed Service Bus trigger, which scales
+by itself; per-client queues on Service Bus would need polling or Event Grid (Premium only).
+Storage queues cost next to nothing per client, so a tenant adds no fixed cost: 1000 tenants still
+run on one namespace, one worker and one storage account.
+
+### Message flow
+
+- **Cloud → client**: the cloud sends with the tenant and the receiving client (or a topic) in the
+  headers to the clients queue. The worker writes the message to the client's Storage Queue (for a
+  topic: of every subscribed client of the tenant) and notifies the client through SignalR, which
+  then fetches it. A subscription lasts until the client unsubscribes, so a client that was
+  offline finds the broadcasts in its queue when it comes back.
+- **Client → cloud**: the client sends through SignalR. The worker refuses every tenant, client or
+  other `dbote-*` header the client set, sets tenant and client from the client's token and puts
+  the message on the cloud queue.
+- **Client → client**: a client whose token carries the worker's peer scope may also send to
+  another client of its own tenant, e.g. an application instance in the cloud asking an agent on
+  the customer's premises. The worker names the sender in the message; the tenant stays the
+  sender's, so there is no way to address another tenant.
+- **Attachments** travel as blobs: the sender uploads, the worker copies to where the receiver may
+  read, and hands out short-lived SAS URIs. A client only ever writes below its own key.
+
+### Security model
+
+- Clients never see Service Bus or anything else inside the cloud; they get SAS URIs for their own
+  queue and for attachments.
+- Tenant and client of a message always come from the worker, from a validated token; a client
+  cannot set them, nor any other `dbote-*` header.
+- Every name the worker keeps per client (queues, SignalR user, subscriptions) is derived from a
+  hash of tenant and client, so no two clients share one, whatever ids the identity provider
+  allows.
+- Within a tenant, any client may read an attachment delivered to that tenant if it knows its id
+  (a GUID it only learns from the message); this is an accepted trade-off for broadcasts.
 
 ## Packages
 
@@ -23,13 +84,45 @@ GitVersion).
 | `Dbosoft.Bote.Rebus` | Clients: the Rebus transport over Storage Queues and SignalR, DataBus |
 | `Dbosoft.Bote.Client.Authentication`, `Dbosoft.Bote.Client.Options` | Clients: signed client assertions, settings |
 | `Dbosoft.Bote.Rebus.Integration` | Cloud side on Rebus: `.EnableBote()`, `.EnableBoteDataBus()` |
-| `Dbosoft.Bote.Cloud` | Cloud side without Rebus, e.g. Azure Functions ([docs/cloud-without-rebus.md](docs/cloud-without-rebus.md)) |
+| `Dbosoft.Bote.Cloud` | Cloud side without Rebus, e.g. Azure Functions |
 | `Dbosoft.Bote.Primitives` | Wire format, header policy, queue and attachment naming shared by all of the above |
 | `Dbosoft.Bote.Options`, `Dbosoft.Bote.AppConfiguration`, `Dbosoft.Bote.Transport.Abstractions`, … | Shared settings and contracts |
 
-The worker itself is not a package but a container image (`src/workers/src/Dbosoft.Bote.BoteWorker`),
-one generic image for every application; its settings are in
-[docs/worker-configuration.md](docs/worker-configuration.md).
+## Using it
+
+Cloud side on Rebus:
+
+```csharp
+configure
+    .Options(o => o.EnableBote(clientsQueue))   // tenant checks, routes {clients}-{clientId} to the clients queue
+    .Transport(t => t.UseAzureServiceBus(connection, cloudQueue))
+    .Serialization(s => s.UseSystemTextJson());
+
+// reply to the client that sent the current message
+await bus.Send(new Pong(), new Dictionary<string, string>
+{
+    [BoteHeaders.TenantId] = MessageContext.Current.Headers[BoteHeaders.TenantId],
+    [BoteHeaders.ClientId] = MessageContext.Current.Headers[BoteHeaders.ClientId],
+});
+```
+
+A broadcast names a topic (`BoteHeaders.Topic`) instead of a client; clients subscribe with
+`bus.Advanced.Topics.Subscribe("chat")`.
+
+Client:
+
+```csharp
+configure
+    .Transport(t => t.UseBote(workerEndpoint, $"{clientsQueue}-{clientId}", credentials, httpClientFactory))
+    .Serialization(s => s.UseSystemTextJson())
+    .DataBus(d => d.UseBoteDataBus())
+    .Routing(r => r.TypeBased().Map<Ping>(cloudQueue));
+```
+
+A client with the peer scope sends to another client of its tenant by its queue,
+`bus.Advanced.Routing.Send($"{clientsQueue}-{otherClientId}", message)`, and finds the sender in
+the `dbote-sender-client-id` header. A message with an attachment names it in
+`dbote-attachment-id`.
 
 ## Local development
 
@@ -68,73 +161,26 @@ The integration tests start Azurite with Testcontainers; with Podman see `test/R
 
 ### Basic Identity Provider
 
-`src/workers/src/Dbosoft.Bote.BasicIdentityProvider` is a minimal reference identity provider for
-development and tests: it issues access tokens to clients that authenticate with a client
-assertion (a JWT signed with the client's ECDSA P-256 key) and publishes its keys as JWKS. It signs
-with a key from configuration (`BasicIdentityProvider:SigningKeyPem`, from Key Vault in Azure) or an
-ephemeral one. Registration is open to anyone. Production deployments use their own identity
-provider; the worker only needs its issuer, JWKS endpoint, audience and scope.
+`src/workers/src/Dbosoft.Bote.BasicIdentityProvider` issues access tokens to registered clients
+(`POST /api/register-client` with tenant, id, public key and optional extra scopes such as the
+peer scope) and publishes its keys as JWKS. It signs with a key from configuration
+(`BasicIdentityProvider:SigningKeyPem`, from Key Vault in Azure) or an ephemeral one. Registration
+is open to anyone: development only.
 
 ## Azure
 
 `infra/` deploys a test environment with CDKTF: the gateway as a reusable construct library
 (`infra/core`, `@dbosoft/bote-infra`) and the samples on top of it. See [infra/README.md](infra/README.md).
 
-## Design
-
-### Flow of a message
-
-#### Cloud -> Client
-1. Cloud: sends to `{clients}-{clientId}` with the tenant header (Rebus), or with `BoteCloudSender`
-2. The Rebus name formatter redirects it to the single clients queue `bote-clients`
-3. Worker: takes it from `bote-clients` and writes it to the client's Storage Queue `{prefix}-{key}`,
-   key = a hash of tenant and client (`BoteClientNames`), then notifies the client through SignalR
-4. Client: fetches the message from its Storage Queue
-
-#### Client -> Cloud
-1. Client: sends through SignalR
-2. Worker: refuses tenant and client headers set by the client, sets them from the verified token
-   and forwards the message to the cloud queue
-
-Attachments (DataBus) travel as blobs next to the messages; the worker copies them between the
-cloud's and the client's side and hands out short-lived SAS URIs.
-
-### Further reading
+## Further reading
 
 - [docs/worker-configuration.md](docs/worker-configuration.md) - worker settings, the resources it expects, client and attachment naming
 - [docs/cloud-without-rebus.md](docs/cloud-without-rebus.md) - cloud side without Rebus, wire format
 - [docs/databus-concept.md](docs/databus-concept.md) - DataBus concept
 
-## Important Technical Decisions
+## Technical decisions
 
-### Use single ASB queue for all clients
-The messages for all clients of all tenants are handled by a single ASB queue.
-
-#### Reasons
-- The ASB trigger in Azure functions requires a fixed name. We want to use the ASB trigger
-  to ensure that we can make use of the automatic scaling and function activation by Azure.
-- Polling dynamically defined ASB queues would require the activation of the function with
-  event grid triggers. Event grid triggers are only available in the premium SKU of ASB.
-
-### Client authentication
-The clients authenticate to the dbote infrastructure with a client assertion JWT which
-is signed with a ECDSA key which is unique to the client.
-
-#### Reasons
-- The client might be deployed for extended periods and hence a static API key might not be
-  considered secure enough.
-- The ECDSA key could protected e.g. by the Windows key store if required
-- The ECDSA key could be used to sign the messages themselves in case additional authentication
-  is required.
-
-### Use Application Insights SDK instead of Open Telemetry SDK
-There are two SDKs to integrate with Azure Monitor: Application Insights and Open Telemetry.
-Microsoft recommends to use the new Open Telemetry SDK for ASP.NET Core. For now, we using
-the Application Insights SDK.
-
-#### Reasons
-- The Open Telemetry SDK for Azure Functions is still in Preview and missing features.
-  This means we would need to mix SDKs.
-- The Visual Studio integration seemingly no longer works with the Open Telemetry SDK.
-  We would need to use a separate dashboard for Open Telemetry (e.g. from .NET Aspire)
-  but that would not support the Application Insights SDK in the function app.
+- **ECDSA client assertions, not API keys** - clients run for years; a key per client can live in
+  the Windows key store and could later sign messages too.
+- **Application Insights SDK, not OpenTelemetry** - the OpenTelemetry SDK for Azure Functions is
+  still in preview and would mean mixing SDKs.
