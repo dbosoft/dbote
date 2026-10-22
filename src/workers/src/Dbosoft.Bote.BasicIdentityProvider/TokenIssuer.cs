@@ -83,17 +83,19 @@ public class TokenIssuer(
             return new BadRequestResult();
         }
 
-        var accessToken = CreateAccessToken(tenantId, clientId);
+        // bote, which every client needs, and what the client was registered with.
+        var scope = string.Join(' ', client.Scopes.Prepend("bote").Distinct());
+        var accessToken = CreateAccessToken(tenantId, clientId, scope);
         return new JsonResult(new Dictionary<string, object>()
         {
             [OpenIdConnectParameterNames.AccessToken] = accessToken,
             [OpenIdConnectParameterNames.TokenType] = "Bearer",
             [OpenIdConnectParameterNames.ExpiresIn] = 900,
-            [OpenIdConnectParameterNames.Scope] = "bote",
+            [OpenIdConnectParameterNames.Scope] = scope,
         });
     }
 
-    private string CreateAccessToken(string tenantId, string clientId)
+    private string CreateAccessToken(string tenantId, string clientId, string scope)
     {
         var tokenCredentials = tokenCredentialsProvider.GetSigningCredentials();
         var handler = new JsonWebTokenHandler();
@@ -102,7 +104,7 @@ public class TokenIssuer(
         [
             new Claim(JwtRegisteredClaimNames.Sub, clientId),
             new Claim("tid", tenantId), 
-            new Claim("scope", "bote"),
+            new Claim("scope", scope),
         ]);
 
         var tokenDescriptor = new SecurityTokenDescriptor

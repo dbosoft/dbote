@@ -15,12 +15,16 @@ public static class BoteStorageConstants
     {
         public const string TenantId = "tenantid";
 
+        /// <summary>The key of the client that sent an attachment to another client.</summary>
+        public const string SenderKey = "botesender";
+
         /// <summary>
         /// Checks if a metadata key is an internal Bote key that should be filtered from user-visible metadata.
         /// </summary>
         public static bool IsInternalKey(string key)
         {
-            return key.Equals(TenantId, StringComparison.OrdinalIgnoreCase);
+            return key.Equals(TenantId, StringComparison.OrdinalIgnoreCase)
+                   || key.Equals(SenderKey, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

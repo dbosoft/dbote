@@ -45,20 +45,28 @@ internal sealed class NegotiateAuthorizer(
             return NegotiateDecision.Deny(HttpStatusCode.InternalServerError);
         }
 
-        if (!token.TryGetValue("scope", out string scope) || scope != openIdOptions.Value.RequiredScope)
+        // OAuth scopes are a space-separated set.
+        token.TryGetValue("scope", out string? scope);
+        var scopes = (scope ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (!scopes.Contains(openIdOptions.Value.RequiredScope, StringComparer.Ordinal))
         {
             logger.LogWarning("Invalid or missing scope. Expected: {ExpectedScope}, Actual: {ActualScope}",
                 openIdOptions.Value.RequiredScope, scope);
             return NegotiateDecision.Deny(HttpStatusCode.Forbidden);
         }
 
-        return NegotiateDecision.Allow(identity);
+        var peerScope = openIdOptions.Value.PeerScope;
+        var mayAddressPeers = !string.IsNullOrEmpty(peerScope) && scopes.Contains(peerScope, StringComparer.Ordinal);
+
+        return NegotiateDecision.Allow(identity, mayAddressPeers);
     }
 }
 
-internal sealed record NegotiateDecision(ClientIdentity? Identity, HttpStatusCode Status)
+/// <param name="MayAddressPeers">Whether the client may send to the other clients of its tenant.</param>
+internal sealed record NegotiateDecision(ClientIdentity? Identity, HttpStatusCode Status, bool MayAddressPeers = false)
 {
-    public static NegotiateDecision Allow(ClientIdentity identity) => new(identity, HttpStatusCode.OK);
+    public static NegotiateDecision Allow(ClientIdentity identity, bool mayAddressPeers = false) =>
+        new(identity, HttpStatusCode.OK, mayAddressPeers);
 
     public static NegotiateDecision Deny(HttpStatusCode status) => new(null, status);
 }

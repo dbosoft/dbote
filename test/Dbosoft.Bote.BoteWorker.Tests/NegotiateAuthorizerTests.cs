@@ -8,17 +8,19 @@ public class NegotiateAuthorizerTests
 {
     private readonly TestIdentityProvider _idp = new();
 
-    private NegotiateAuthorizer CreateAuthorizer(string requiredScope = TestIdentityProvider.Scope)
+    private NegotiateAuthorizer CreateAuthorizer(string requiredScope = TestIdentityProvider.Scope,
+        string? peerScope = null)
     {
-        var options = TestIdentityProvider.Options(requiredScope);
+        var options = TestIdentityProvider.Options(requiredScope, peerScope);
         return new NegotiateAuthorizer(
             _idp.CreateValidator(options),
             Microsoft.Extensions.Options.Options.Create(options),
             NullLogger<NegotiateAuthorizer>.Instance);
     }
 
-    private Task<NegotiateDecision> Authorize(string? header, string requiredScope = TestIdentityProvider.Scope) =>
-        CreateAuthorizer(requiredScope).Authorize(header, CancellationToken.None);
+    private Task<NegotiateDecision> Authorize(string? header, string requiredScope = TestIdentityProvider.Scope,
+        string? peerScope = null) =>
+        CreateAuthorizer(requiredScope, peerScope).Authorize(header, CancellationToken.None);
 
     [Fact]
     public async Task Takes_the_identity_from_the_token()
@@ -91,12 +93,35 @@ public class NegotiateAuthorizerTests
     [Theory]
     [InlineData(null)]
     [InlineData("other")]
-    [InlineData("bote other")]
+    [InlineData("botex")]
+    [InlineData("bote.peer")]
     public async Task Forbids_a_token_without_the_required_scope(string? scope)
     {
         var decision = await Authorize($"Bearer {_idp.Issue(scope: scope)}");
 
         decision.Should().Be(NegotiateDecision.Deny(HttpStatusCode.Forbidden));
+    }
+
+    [Fact]
+    public async Task Accepts_the_required_scope_among_others()
+    {
+        var decision = await Authorize($"Bearer {_idp.Issue(scope: "other bote")}");
+
+        decision.Status.Should().Be(HttpStatusCode.OK);
+        decision.MayAddressPeers.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("bote bote.peer", "bote.peer", true)]
+    [InlineData("bote", "bote.peer", false)]
+    [InlineData("bote bote.peer", null, false)] // the worker allows no peers
+    [InlineData("bote bote.peerx", "bote.peer", false)]
+    public async Task Only_the_peer_scope_lets_a_client_address_its_peers(string scope, string? peerScope, bool expected)
+    {
+        var decision = await Authorize($"Bearer {_idp.Issue(scope: scope)}", peerScope: peerScope);
+
+        decision.Status.Should().Be(HttpStatusCode.OK);
+        decision.MayAddressPeers.Should().Be(expected);
     }
 
     [Fact]

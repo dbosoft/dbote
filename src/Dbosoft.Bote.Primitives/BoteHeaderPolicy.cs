@@ -8,9 +8,11 @@ namespace Dbosoft.Bote.Primitives;
 /// (<see cref="BoteHeaders.Topic"/>), the cloud-inbox SAS
 /// (<see cref="BoteHeaders.DataBusInboxSas"/>), retry tracking
 /// (<see cref="BoteHeaders.ReScheduleCounter"/>) - and a client must not set any of it.
-/// The one exception is <see cref="BoteHeaders.AttachmentId"/>, which the client
-/// legitimately sets to reference a DataBus upload. Rebus envelope headers (<c>rbs2-*</c>)
-/// and any non-<c>dbote-</c> header pass through.
+/// The exceptions are <see cref="BoteHeaders.AttachmentId"/>, which the client legitimately
+/// sets to reference a DataBus upload, and <see cref="BoteHeaders.SenderClientId"/>, which a
+/// client passes on when Rebus defers a message it received from another client; the worker
+/// replaces it with the true sender on everything a client sends to another client. Rebus
+/// envelope headers (<c>rbs2-*</c>) and any non-<c>dbote-</c> header pass through.
 ///
 /// This is an allow-list, not a block-list, so a newly added <c>dbote-*</c> header is
 /// rejected by default rather than silently spoofable until someone remembers to block it.
@@ -24,7 +26,8 @@ public static class BoteHeaderPolicy
     /// </summary>
     public static bool IsClientAllowed(string headerKey) =>
         !headerKey.StartsWith(BoteHeaderPrefix, StringComparison.OrdinalIgnoreCase)
-        || headerKey.Equals(BoteHeaders.AttachmentId, StringComparison.OrdinalIgnoreCase);
+        || headerKey.Equals(BoteHeaders.AttachmentId, StringComparison.OrdinalIgnoreCase)
+        || headerKey.Equals(BoteHeaders.SenderClientId, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Returns the header keys a client is not allowed to set (i.e. spoof attempts).

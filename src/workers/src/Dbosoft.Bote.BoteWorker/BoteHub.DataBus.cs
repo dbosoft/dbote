@@ -18,6 +18,51 @@ namespace Dbosoft.Bote.BoteWorker
             Ready
         }
 
+        /// <summary>
+        /// Copies a client's attachment from the inbox to where the clients of its tenant read
+        /// what was sent to them, for a message to another client. The copy may still be running
+        /// when this returns; the message waits for it on the clients queue.
+        /// </summary>
+        private async Task DeliverPeerAttachment(BlobContainerClient inbox, string inboxPath,
+            string tenantId, string senderClientId, string attachmentId)
+        {
+            var source = inbox.GetBlobClient(inboxPath);
+            var sourceProperties = await source.GetPropertiesAsync();
+            var senderKey = BoteClientNames.ClientKey(tenantId, senderClientId);
+            var metadata = new Dictionary<string, string>(sourceProperties.Value.Metadata)
+            {
+                [BoteStorageConstants.Metadata.TenantId] = tenantId,
+                [BoteStorageConstants.Metadata.SenderKey] = senderKey,
+            };
+
+            var container = await GetClientBlobContainer(tenantId);
+            var destination = container.GetBlobClient(DataBusPaths.Delivered(tenantId, attachmentId));
+            var sourceUri = source.GenerateSasUri(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(2));
+
+            try
+            {
+                // Never over what is there: the id is the sender's choice, and the path is the one
+                // the tenant's attachments from the cloud use as well.
+                await destination.StartCopyFromUriAsync(sourceUri, new BlobCopyFromUriOptions
+                {
+                    Metadata = metadata,
+                    DestinationConditions = new BlobRequestConditions { IfNoneMatch = ETag.All },
+                });
+            }
+            catch (RequestFailedException ex) when (ex.Status is 409 or 412)
+            {
+                // A redelivered message copies again; what the first attempt copied is it.
+                var existing = await destination.GetPropertiesAsync();
+                if (!existing.Value.Metadata.TryGetValue(BoteStorageConstants.Metadata.SenderKey, out var key)
+                    || key != senderKey)
+                {
+                    logger.LogWarning("Client {TenantId}/{ClientId} sent attachment {AttachmentId}, whose id is taken",
+                        tenantId, senderClientId, attachmentId);
+                    throw new InvalidOperationException($"Attachment {attachmentId} already exists.");
+                }
+            }
+        }
+
         private async Task<BlobContainerClient> GetClientBlobContainer(string tenantId)
         {
             var (storageClient, containerName) = await tenantStorageResolver.ResolveClientDataStore(tenantId);

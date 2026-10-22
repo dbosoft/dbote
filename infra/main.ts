@@ -77,6 +77,7 @@ class DboteStack extends TerraformStack {
         jwksUri: `${identityProvider.endpoint}/.well-known/jwks.json`,
         audience,
         requiredScope: 'bote',
+        peerScope: 'bote.peer',
       },
     });
 

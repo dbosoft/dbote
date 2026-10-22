@@ -4,7 +4,8 @@ using Dbosoft.Bote.Primitives;
 namespace Dbosoft.Bote.Rebus.IntegrationTests;
 
 // Guards the trust-boundary allow-list: a client may only set rbs2-*/non-dbote headers
-// plus dbote-attachment-id; every other worker-controlled dbote-* header is a spoof attempt.
+// plus dbote-attachment-id and dbote-sender-client-id (which the worker replaces); every other
+// worker-controlled dbote-* header is a spoof attempt.
 public class BoteHeaderPolicyTests
 {
     [Theory]
@@ -13,6 +14,7 @@ public class BoteHeaderPolicyTests
     [InlineData("content-type", true)]
     [InlineData("dbote-attachment-id", true)]
     [InlineData("DBOTE-ATTACHMENT-ID", true)] // case-insensitive
+    [InlineData("dbote-sender-client-id", true)] // passed on when Rebus defers a peer's message
     [InlineData("dbote-tenant-id", false)]
     [InlineData("dbote-client-id", false)]
     [InlineData("dbote-cloud-inbox-sas", false)]

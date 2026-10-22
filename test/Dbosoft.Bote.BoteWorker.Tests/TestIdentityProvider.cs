@@ -50,12 +50,13 @@ internal sealed class TestIdentityProvider : HttpMessageHandler, IHttpClientFact
         new(this, Microsoft.Extensions.Options.Options.Create(options ?? Options()),
             NullLogger<TokenValidationService>.Instance, Time);
 
-    public static OpenIdOptions Options(string requiredScope = Scope) => new()
+    public static OpenIdOptions Options(string requiredScope = Scope, string? peerScope = null) => new()
     {
         Authority = Authority,
         Audience = Audience,
         JwksUri = JwksUri,
         RequiredScope = requiredScope,
+        PeerScope = peerScope,
     };
 
     public string Issue(

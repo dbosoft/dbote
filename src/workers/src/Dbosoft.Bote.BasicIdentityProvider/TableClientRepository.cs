@@ -29,6 +29,7 @@ public class TableClientRepository : IClientRepository
                 TenantId = entity.Value.PartitionKey,
                 Id = entity.Value.RowKey,
                 PublicKey = entity.Value.PublicKey,
+                Scopes = entity.Value.Scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries),
             };
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
@@ -43,6 +44,7 @@ public class TableClientRepository : IClientRepository
             PartitionKey = client.TenantId,
             RowKey = client.Id,
             PublicKey = client.PublicKey,
+            Scopes = string.Join(' ', client.Scopes),
         });
 
     private class ClientEntity : ITableEntity
@@ -50,6 +52,7 @@ public class TableClientRepository : IClientRepository
         public string PartitionKey { get; set; } = string.Empty;
         public string RowKey { get; set; } = string.Empty;
         public string PublicKey { get; set; } = string.Empty;
+        public string Scopes { get; set; } = string.Empty;
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
     }

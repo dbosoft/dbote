@@ -40,11 +40,13 @@ internal partial class BoteHub
         var clientId = ExtractClientId(invocationContext);
 
 
-        // Clients send to the cloud queue, or to their own queue to defer a message.
-        var target = BoteQueuePolicy.ResolveClientSendTarget(queue,
-            serviceBusOptions.Value.Queues.Cloud, serviceBusOptions.Value.Queues.Clients, clientId);
+        // Clients send to the cloud queue, to their own queue to defer a message, or - with the
+        // peer scope - to another client of their tenant.
+        var route = BoteQueuePolicy.ResolveClientSendRoute(queue,
+            serviceBusOptions.Value.Queues.Cloud, serviceBusOptions.Value.Queues.Clients, clientId,
+            MayAddressPeers(invocationContext));
 
-        if (target is null)
+        if (route is null)
         {
             logger.LogWarning("Client {TenantId}-{ClientId} attempted to send to unauthorized queue: {Queue}",
                 tenantId, clientId, queue);
@@ -67,23 +69,34 @@ internal partial class BoteHub
         var serviceBusMessage = messageConverter.ToServiceBus(message);
         workerMetrics.InToServiceBus.Record(WorkerMetrics.MsSince(tsb));
 
-        // Add authenticated tenant/client identity to message properties
-        serviceBusMessage.ApplicationProperties.Add(BoteHeaders.TenantId, tenantId);
-        serviceBusMessage.ApplicationProperties.Add(BoteHeaders.ClientId, clientId);
+        // The tenant is always the sender's. For the cloud the client id names the sender; on
+        // the clients queue it names the receiver, and a message to a peer names its sender
+        // apart, set here from the token - whatever the client put there.
+        serviceBusMessage.ApplicationProperties[BoteHeaders.TenantId] = tenantId;
+        serviceBusMessage.ApplicationProperties[BoteHeaders.ClientId] = route.ClientId ?? clientId;
+        switch (route.Target)
+        {
+            case ClientSendTarget.Peer:
+                serviceBusMessage.ApplicationProperties[BoteHeaders.SenderClientId] = clientId;
+                break;
+            case ClientSendTarget.Cloud:
+                serviceBusMessage.ApplicationProperties.Remove(BoteHeaders.SenderClientId);
+                break;
+            // Self: a deferred message keeps the sender of the message it was made from.
+        }
 
-
-        // A message to itself goes through the clients queue, which delivers it back to the
-        // client at its scheduled time; the identity set above routes it to the sender only.
-        var targetQueueName = target == ClientSendTarget.Self
-            ? serviceBusOptions.Value.Queues.Clients
-            : serviceBusOptions.Value.Queues.Cloud;
+        // Messages to clients - itself or a peer - go through the clients queue, which delivers
+        // them at their scheduled time.
+        var targetQueueName = route.Target == ClientSendTarget.Cloud
+            ? serviceBusOptions.Value.Queues.Cloud
+            : serviceBusOptions.Value.Queues.Clients;
         Uri? sasUri = null;
 
         // Check if this is an attachment message that needs monitoring
         if (serviceBusMessage.ApplicationProperties.TryGetValue(BoteHeaders.AttachmentId,
                 out var attachmentIdOb))
         {
-            if (target == ClientSendTarget.Self)
+            if (route.Target == ClientSendTarget.Self)
                 throw new NotSupportedException("A client cannot send an attachment to itself.");
 
             var attachmentId = attachmentIdOb.ToString()
@@ -99,6 +112,10 @@ internal partial class BoteHub
             {
                 case AttachmentState.Failed:
                     throw new InvalidDataException($"Failed to copy attachment {BoteHeaders.AttachmentId}");
+                case AttachmentState.Ready when route.Target == ClientSendTarget.Peer:
+                    // The receiver reads it where clients read what the cloud sent them.
+                    await DeliverPeerAttachment(container, inboxPath, tenantId, clientId, attachmentId);
+                    break;
                 case AttachmentState.Ready:
                     // fall through to forwarding logic
                     sasUri = CreateAttachmentInboxSasUri(container, inboxPath);
@@ -189,6 +206,10 @@ internal partial class BoteHub
         foreach (var key in boteMsg.Headers.Keys
                      .Where(k => k.StartsWith("dbote-", StringComparison.OrdinalIgnoreCase)).ToList())
             boteMsg.Headers.Remove(key);
+        // Except the sender of a message from another client: set by the worker from the
+        // sender's token, it tells the receiver who is asking.
+        if (message.ApplicationProperties.TryGetValue(BoteHeaders.SenderClientId, out var senderClientId))
+            boteMsg.Headers[BoteHeaders.SenderClientId] = senderClientId.ToString()!;
 
         logger.LogInformation("Ready to forward message {MessageId} to tenant {TenantId}", 
             message.MessageId, tenantId);
@@ -222,6 +243,8 @@ internal partial class BoteHub
             throw new InvalidOperationException($"Missing {BoteHeaders.TenantId} in message properties.");
 
         var tenantId = tenantIdObj.ToString()!;
+        // Only the worker sets the sender, and only on messages from a client to a peer.
+        var isPeerMessage = message.ApplicationProperties.ContainsKey(BoteHeaders.SenderClientId);
         Uri? sasUri = null;
         if (message.ApplicationProperties.TryGetValue(BoteHeaders.AttachmentId,
                 out var attachmentIdOb))
@@ -229,11 +252,14 @@ internal partial class BoteHub
             var attachmentId = attachmentIdOb.ToString()
                                ?? throw new InvalidOperationException(
                                    $"Invalid {BoteHeaders.AttachmentId} header value.");
-            if (!message.ApplicationProperties.TryGetValue(BoteHeaders.ClientId, out var clientIdObj))
+            // The client that uploaded it: the sender of a message to a peer, else the client id.
+            if (!message.ApplicationProperties.TryGetValue(BoteHeaders.SenderClientId, out var senderObj)
+                && !message.ApplicationProperties.TryGetValue(BoteHeaders.ClientId, out senderObj))
                 throw new InvalidOperationException($"Missing {BoteHeaders.ClientId} in message properties.");
+            var senderClientId = senderObj.ToString()!;
 
             var container = blobServiceClient.GetBlobContainerClient(BoteStorageConstants.Inbox);
-            var inboxPath = DataBusPaths.Inbox(tenantId, clientIdObj.ToString()!, attachmentId);
+            var inboxPath = DataBusPaths.Inbox(tenantId, senderClientId, attachmentId);
 
             // Check attachment readiness
             var attachmentState = await IsAttachmentReady(container, tenantId, attachmentId, inboxPath);
@@ -246,6 +272,9 @@ internal partial class BoteHub
                             {
                                 ["Reason"] = "Attachment copy failed"
                             });
+                    break;
+                case AttachmentState.Ready when isPeerMessage:
+                    await DeliverPeerAttachment(container, inboxPath, tenantId, senderClientId, attachmentId);
                     break;
                 case AttachmentState.Ready:
                     // Attachment is ready! Generate SAS URL and forward to Cloud queue
@@ -285,7 +314,10 @@ internal partial class BoteHub
         if(sasUri!= null)
             readyMessage.ApplicationProperties[BoteHeaders.DataBusInboxSas] = sasUri.ToString();
 
-        await senderCache.GetSender(serviceBusOptions.Value.Queues.Cloud)
+        // A message to a peer goes on to the clients queue, which delivers it to the receiver.
+        await senderCache.GetSender(isPeerMessage
+                ? serviceBusOptions.Value.Queues.Clients
+                : serviceBusOptions.Value.Queues.Cloud)
             .SendMessageAsync(readyMessage);
         await messageActions.CompleteMessageAsync(message);
     }

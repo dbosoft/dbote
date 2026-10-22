@@ -1,3 +1,4 @@
+using Dbosoft.Bote.Primitives;
 using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace Dbosoft.Bote.BoteWorker;
@@ -31,13 +32,10 @@ public record ClientIdentity(string TenantId, string ClientId)
         if (!token.TryGetValue("tid", out string tenantId) || string.IsNullOrEmpty(tenantId))
             return false;
 
-        if (!IsPathSegment(tenantId) || !IsPathSegment(clientId))
+        if (!BoteIds.IsPathSegment(tenantId) || !BoteIds.IsPathSegment(clientId))
             return false;
 
         identity = new ClientIdentity(tenantId, clientId);
         return true;
     }
-
-    private static bool IsPathSegment(string id) =>
-        id is not ("." or "..") && !id.Any(c => c is '/' or '\\' || char.IsControl(c));
 }

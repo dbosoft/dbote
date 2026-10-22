@@ -40,7 +40,8 @@ foreach (var client in clients)
         {
             TenantId = client.TenantId,
             Id = client.ClientId,
-            PublicKey = client.PublicKey
+            PublicKey = client.PublicKey,
+            Scopes = client.Scopes ?? [],
         };
 
         var response = await httpClient.PostAsJsonAsync($"{identityProviderUrl}/api/register-client", payload);

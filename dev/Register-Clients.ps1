@@ -34,6 +34,7 @@ try {
                 TenantId = $client.TenantId
                 Id = $client.ClientId
                 PublicKey = $client.PublicKey
+                Scopes = @(if ($client.PSObject.Properties['Scopes']) { $client.Scopes })
             } | ConvertTo-Json
 
             $response = Invoke-WebRequest `

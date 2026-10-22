@@ -70,6 +70,8 @@ internal partial class BoteHub(
             [
                 new Claim(ClaimNames.TenantId, identity.TenantId),
                 new Claim(ClaimNames.ClientId, identity.ClientId),
+                // The hub calls see only these claims, not the token.
+                ..(decision.MayAddressPeers ? [new Claim(ClaimNames.MayAddressPeers, "true")] : Array.Empty<Claim>()),
             ],
             CloseOnAuthenticationExpiration = true,
             TokenLifetime = TimeSpan.FromMinutes(15),
@@ -140,6 +142,9 @@ internal partial class BoteHub(
         };
     }
 
+
+    private static bool MayAddressPeers(SignalRInvocationContext context) =>
+        context.Claims.TryGetValue(ClaimNames.MayAddressPeers, out var value) && value == "true";
 
     private static string ExtractTenantId(SignalRInvocationContext context)
     {

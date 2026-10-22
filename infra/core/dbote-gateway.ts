@@ -19,6 +19,8 @@ export interface DboteOpenIdSettings {
     readonly jwksUri: string;
     readonly audience: string;
     readonly requiredScope: string;
+    /** A client whose token carries this scope too may send to the other clients of its tenant. */
+    readonly peerScope?: string;
 }
 
 /**
@@ -267,5 +269,7 @@ export class DboteGateway extends Construct {
         worker.addAppSetting('dbote__Worker__OpenId__JwksUri', props.openId.jwksUri);
         worker.addAppSetting('dbote__Worker__OpenId__Audience', props.openId.audience);
         worker.addAppSetting('dbote__Worker__OpenId__RequiredScope', props.openId.requiredScope);
+        if (props.openId.peerScope)
+            worker.addAppSetting('dbote__Worker__OpenId__PeerScope', props.openId.peerScope);
     }
 }
