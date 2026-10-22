@@ -92,7 +92,8 @@ internal partial class BoteHub
             var container = blobServiceClient.GetBlobContainerClient(BoteStorageConstants.Inbox);
 
             // Check attachment readiness
-            var attachmentState = await IsAttachmentReady(container, tenantId, attachmentId);
+            var inboxPath = DataBusPaths.Inbox(tenantId, clientId, attachmentId);
+            var attachmentState = await IsAttachmentReady(container, tenantId, attachmentId, inboxPath);
 
             switch (attachmentState)
             {
@@ -100,7 +101,7 @@ internal partial class BoteHub
                     throw new InvalidDataException($"Failed to copy attachment {BoteHeaders.AttachmentId}");
                 case AttachmentState.Ready:
                     // fall through to forwarding logic
-                    sasUri = CreateAttachmentInboxSasUri(container, tenantId, attachmentId);
+                    sasUri = CreateAttachmentInboxSasUri(container, inboxPath);
 
                     break;
                 case AttachmentState.Pending:
@@ -151,7 +152,8 @@ internal partial class BoteHub
             var attachmentId = attachmentIdObj.ToString()!;
             var blobContainer = await GetClientBlobContainer(tenantId);
             // Check attachment readiness
-            var attachmentState = await IsAttachmentReady(blobContainer, tenantId, attachmentId);
+            var attachmentState = await IsAttachmentReady(blobContainer, tenantId, attachmentId,
+                DataBusPaths.Delivered(tenantId, attachmentId));
 
             switch (attachmentState)
             {
@@ -227,10 +229,14 @@ internal partial class BoteHub
             var attachmentId = attachmentIdOb.ToString()
                                ?? throw new InvalidOperationException(
                                    $"Invalid {BoteHeaders.AttachmentId} header value.");
+            if (!message.ApplicationProperties.TryGetValue(BoteHeaders.ClientId, out var clientIdObj))
+                throw new InvalidOperationException($"Missing {BoteHeaders.ClientId} in message properties.");
+
             var container = blobServiceClient.GetBlobContainerClient(BoteStorageConstants.Inbox);
+            var inboxPath = DataBusPaths.Inbox(tenantId, clientIdObj.ToString()!, attachmentId);
 
             // Check attachment readiness
-            var attachmentState = await IsAttachmentReady(container, tenantId, attachmentId);
+            var attachmentState = await IsAttachmentReady(container, tenantId, attachmentId, inboxPath);
 
             switch (attachmentState)
             {
@@ -243,7 +249,7 @@ internal partial class BoteHub
                     break;
                 case AttachmentState.Ready:
                     // Attachment is ready! Generate SAS URL and forward to Cloud queue
-                    sasUri = CreateAttachmentInboxSasUri(container, tenantId, attachmentId);
+                    sasUri = CreateAttachmentInboxSasUri(container, inboxPath);
                     break;
                 case AttachmentState.Pending:
                 default:
@@ -284,11 +290,9 @@ internal partial class BoteHub
         await messageActions.CompleteMessageAsync(message);
     }
 
-    private Uri CreateAttachmentInboxSasUri(BlobContainerClient container,
-        string tenantId, string attachmentId)
+    private static Uri CreateAttachmentInboxSasUri(BlobContainerClient container, string inboxPath)
     {
-        var blobPath = $"{tenantId}/{attachmentId}";
-        var blobClient = container.GetBlobClient(blobPath);
+        var blobClient = container.GetBlobClient(inboxPath);
         // Short-lived: this SAS travels inside the message (ASB application property) and would
         // otherwise sit in the DLQ / telemetry as a long-lived delete capability. It is minted
         // only once the attachment is Ready and is consumed by the cloud's DataBusIncomingStep

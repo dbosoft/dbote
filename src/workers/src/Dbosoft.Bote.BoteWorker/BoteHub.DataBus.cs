@@ -28,9 +28,8 @@ namespace Dbosoft.Bote.BoteWorker
 
 
         private async Task<AttachmentState> IsAttachmentReady(BlobContainerClient containerClient,
-            string tenantId, string attachmentId)
+            string tenantId, string attachmentId, string blobPath)
         {
-            var blobPath = $"{tenantId}/{attachmentId}";
             var blobClient = containerClient.GetBlobClient(blobPath);
 
             try
@@ -95,8 +94,7 @@ namespace Dbosoft.Bote.BoteWorker
             var clientId = ExtractClientId(invocationContext);
 
             var container = await GetClientBlobContainer(tenantId);
-            var blobPath = $"{tenantId}/{attachmentId}";
-            var blobClient = container.GetBlobClient(blobPath);
+            var blobClient = container.GetBlobClient(DataBusPaths.Delivered(tenantId, attachmentId));
 
             // Validate blob exists and belongs to tenant
             try
@@ -150,13 +148,13 @@ namespace Dbosoft.Bote.BoteWorker
             var container = await GetClientBlobContainer(tenantId);
             await container.CreateIfNotExistsAsync();
 
-            var blobPath = $"{tenantId}/{attachmentId}";
-            var blobClient = container.GetBlobClient(blobPath);
+            // Under the client's own key: an upload can only overwrite the client's own uploads.
+            // Write is needed for block uploads (large or unseekable streams), which a create-only
+            // SAS refuses; the path, not the permission, keeps it away from other attachments.
+            var blobClient = container.GetBlobClient(DataBusPaths.Upload(tenantId, clientId, attachmentId));
 
-            // Generate URI for upload
             var uri = blobClient.GenerateBlobSasUri(
-                BlobSasPermissions.Write | BlobSasPermissions.Create
-                                         | BlobSasPermissions.Read,
+                BlobSasPermissions.Write | BlobSasPermissions.Create,
                 DateTimeOffset.UtcNow.AddHours(1));
 
             logger.LogDebug("Issued upload URI for tenant {TenantId}, client {ClientId}, attachment {AttachmentId}",
@@ -187,8 +185,7 @@ namespace Dbosoft.Bote.BoteWorker
             // Resolve client storage for this tenant
             var (cloudStorage, cloudInboxContainer) = await tenantStorageResolver.ResolveClientDataStore(tenantId);
             var cloudInbox = cloudStorage.GetBlobContainerClient(cloudInboxContainer);
-            var blobPath = $"{tenantId}/{attachmentId}";
-            var blob = cloudInbox.GetBlobClient(blobPath);
+            var blob = cloudInbox.GetBlobClient(DataBusPaths.Delivered(tenantId, attachmentId));
 
             try
             {
@@ -226,11 +223,9 @@ namespace Dbosoft.Bote.BoteWorker
 
             var clientContainer = await GetClientBlobContainer(tenantId);
 
-            var blobPath = $"{tenantId}/{attachmentId}";
-
             var destinationContainer = blobServiceClient.GetBlobContainerClient(BoteStorageConstants.Inbox);
-            var sourceBlob = clientContainer.GetBlobClient(blobPath);
-            var destBlob = destinationContainer.GetBlobClient(blobPath);
+            var sourceBlob = clientContainer.GetBlobClient(DataBusPaths.Upload(tenantId, clientId, attachmentId));
+            var destBlob = destinationContainer.GetBlobClient(DataBusPaths.Inbox(tenantId, clientId, attachmentId));
 
             // Add internal metadata to source blob
             try

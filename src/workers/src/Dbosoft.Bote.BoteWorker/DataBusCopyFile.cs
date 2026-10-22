@@ -53,8 +53,7 @@ internal class DataBusCopyFile(
         var containerClient = clientStorageClient.GetBlobContainerClient(clientContainerName);
         await containerClient.CreateIfNotExistsAsync();
 
-        var blobPath = $"{tenantId}/{attachmentId}";
-        var destBlob = containerClient.GetBlobClient(blobPath);
+        var destBlob = containerClient.GetBlobClient(DataBusPaths.Delivered(tenantId, attachmentId));
 
         // Generate SAS URIs for both source and destination (for copy operation)
         var sourceUri = sourceBlob.GenerateBlobSasUri(

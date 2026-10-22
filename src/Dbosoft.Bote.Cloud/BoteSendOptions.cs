@@ -1,3 +1,5 @@
+using Dbosoft.Bote.Primitives;
+
 namespace Dbosoft.Bote.Cloud;
 
 public sealed class BoteSendOptions
@@ -32,11 +34,8 @@ public sealed class BoteOutgoingAttachment
 {
     public BoteOutgoingAttachment(string id, Stream content, IReadOnlyDictionary<string, string>? metadata = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentNullException.ThrowIfNull(content);
-        if (id.IndexOfAny(['/', '\\']) >= 0 || id.Contains(".."))
-            throw new ArgumentException("An attachment id cannot contain a path.", nameof(id));
-        Id = id;
+        Id = BoteAttachmentIds.Validate(id);
         Content = content;
         Metadata = metadata;
     }
