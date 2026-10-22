@@ -1,45 +1,37 @@
 #Requires -Version 7.4
+<#
+.SYNOPSIS
+    Builds what terraform deploys: the worker image (pushed to the registry) and the identity
+    provider's package (artifacts/Dbosoft.Bote.BasicIdentityProvider.zip, uploaded by terraform).
+    Uses podman when it is there, docker otherwise.
+#>
 [CmdletBinding()]
-param()
+param(
+    [string]$Registry = 'acrdbotecmdev',
+    [string]$Tag = 'latest'
+)
 
 $PSNativeCommandUseErrorActionPreference = $true
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
-$acr = 'acrbotetest.azurecr.io'
-$acrName = 'acrbotetest'
 $artifactsPath = Join-Path $PSScriptRoot 'artifacts'
+$src = Join-Path $PSScriptRoot '../src/workers/src'
+$container = (Get-Command podman -ErrorAction SilentlyContinue) ? 'podman' : 'docker'
+$loginServer = az acr show --name $Registry --query loginServer --output tsv
 
-az acr login --name $acrName
+# The worker: its Dockerfile copies the linux-x64 publish output.
+$worker = Join-Path $src 'Dbosoft.Bote.BoteWorker'
+dotnet publish $worker -c Release -r linux-x64 --self-contained false -nodeReuse:false
+$image = "$loginServer/dbote-worker:$Tag"
+& $container build --platform linux/amd64 --tag $image $worker
+az acr login --name $Registry --expose-token --output tsv --query accessToken |
+    & $container login $loginServer --username 00000000-0000-0000-0000-000000000000 --password-stdin
+& $container push $image
 
-try {
-    Push-Location ../src/workers/src/Dbosoft.Bote.BoteWorker
-    dotnet publish -c Release -r linux-x64 -o (Join-Path $artifactsPath 'Dbosoft.Bote.BoteWorker')
-    Compress-Archive `
-        -Path "$(Join-Path $artifactsPath 'Dbosoft.Bote.BoteWorker')/*" `
-        -DestinationPath (Join-Path $artifactsPath 'Dbosoft.Bote.BoteWorker.zip') `
-        -Force
-    Pop-Location
-
-    Push-Location ../src/workers/src/Dbosoft.Bote.BasicIdentityProvider
-    dotnet publish -c Release -r linux-x64 -o (Join-Path $artifactsPath 'Dbosoft.Bote.BasicIdentityProvider')
-    Compress-Archive `
-        -Path "$(Join-Path $artifactsPath 'Dbosoft.Bote.BasicIdentityProvider')/*" `
-        -DestinationPath (Join-Path $artifactsPath 'Dbosoft.Bote.BasicIdentityProvider.zip') `
-        -Force
-    Pop-Location
-
-    Push-Location ../test/benchmark/Dbosoft.Bote.Benchmark.Cloud
-    dotnet publish -c Release -r linux-x64
-    docker build --tag "$acr/dbote-benchmark/cloud" ./
-    docker push "$acr/dbote-benchmark/cloud"
-    Pop-Location
-
-    Push-Location ../test/benchmark/Dbosoft.Bote.Benchmark.Service
-    dotnet publish -c Release -r linux-x64
-    docker build --tag "$acr/dbote-benchmark/service" ./
-    docker push "$acr/dbote-benchmark/service"
-    Pop-Location
-} finally {
-    Pop-Location
-}
+# The identity provider: a zip for Flex Consumption.
+$idpOut = Join-Path $artifactsPath 'Dbosoft.Bote.BasicIdentityProvider'
+Remove-Item $idpOut -Recurse -Force -ErrorAction SilentlyContinue
+dotnet publish (Join-Path $src 'Dbosoft.Bote.BasicIdentityProvider') -c Release -r linux-x64 --self-contained false `
+    -nodeReuse:false -o $idpOut
+Compress-Archive -Path "$idpOut/*" -DestinationPath (Join-Path $artifactsPath 'Dbosoft.Bote.BasicIdentityProvider.zip') -Force

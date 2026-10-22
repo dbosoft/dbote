@@ -11,9 +11,9 @@ import { DboteSampleApp } from "./app/dbote-sample-app";
 // @dbosoft/bote-infra (./core) and the samples as the application on top of it. An application
 // of its own builds the same stack with its own application layer instead of DboteSampleApp.
 
-const location = "westeurope"; // Define the location for resources
+const location = "swedencentral"; // next to the SAPId admin tool, the first application on it
 const resourceGroupName = "rg-dbote-test"; // Define the resource group name
-const tenantId = 'cb0bb315-f38b-4ab4-ad2d-d3ed25d23b53';
+const tenantId = '5a6e4bb8-08fb-4be2-96de-66506eb05cb2';
 const subscriptionId = '998590b9-1c43-452a-9b02-dcf9ed5acb64';
 
 
@@ -48,7 +48,7 @@ class DboteStack extends TerraformStack {
       sku: 'developer',
     });
 
-    // The registry already exists; the worker image is pushed there by Prepare-Artifacts.ps1.
+    // The registry already exists (Initialize-Platform.ps1); Prepare-Artifacts.ps1 pushes the worker image.
     const registry = new DataAzurermContainerRegistry(this, 'acrdbotecmdev', {
       name: 'acrdbotecmdev',
       resourceGroupName,

@@ -1,16 +1,19 @@
 # Deployment to Azure
 
 ## How to deploy locally
-You need docker, Azure CLI and Node 20 with npm.
+You need podman (or docker), Azure CLI, Terraform and Node 20 with npm. Run the scripts from PowerShell:
+Git Bash rewrites arguments starting with `/subscriptions/...` into file paths.
 
 1. Install packages: `npm install`
-2. Login to Azure: `az login` (make sure to select the correct subscription)
-3. Build the artifacts: `./Prepare-Artifacts.ps1` (build the Azure function zip and pushes the containers to the ACR)
-4. Assign yourself `Storage Blob Data Contributor` for the storage account `stdbotestfstate` (contains the Terraform state)
-5. Assign yourself `App Configuration Data Owner` for the resource group `rg-dbote-test`
-6. Run CDKTF with `npm run build` and `npm run synth`
-7. Go to: `./cdktf.out/stacks/infra`
-8. Run `terraform apply` (might take several minutes)
+2. Login to Azure: `az login` and select the subscription (`main.ts` names tenant and subscription)
+3. Once per subscription: `./Initialize-Platform.ps1` creates the resource group, the storage account
+   for the Terraform state, the container registry and gives you the data roles terraform needs
+4. Build the artifacts: `./Prepare-Artifacts.ps1` (pushes the worker image, zips the identity provider)
+5. Synthesize: `$env:TS_NODE_PREFER_TS_EXTS='true'; npx cdktf synth`
+6. In `./cdktf.out/stacks/infra`: `terraform init`, `terraform apply` (the identity provider's Flex
+   Consumption app takes 10-15 minutes)
+7. Once after the first apply: put a P-256 key as PEM into the secret `idp-signing-key` of
+   `kv-dbote-idp-cmdev`, which the identity provider signs with
 
 ## Debugging
 The following environment variables can be configured to generate debugging output:

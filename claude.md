@@ -488,30 +488,20 @@ The `infra/` folder contains **test infrastructure deployment** to Azure using C
 - Docker, Azure CLI, Node.js 20+
 - Azure subscription with appropriate permissions
 
-**Deployment Steps**:
-```bash
+**Deployment Steps** (details in `infra/README.md`; run from PowerShell, not Git Bash):
+```powershell
 cd infra
-
-# Install dependencies
 npm install
-
-# Login to Azure
-az login
-
-# Build artifacts (Azure Function zip, container images)
-./Prepare-Artifacts.ps1
-
-# Assign yourself Storage Blob Data Contributor role for Terraform state
-# (storage account: stdbotestfstate)
-
-# Build and synthesize Terraform
-npm run build
-npm run synth
-
-# Apply infrastructure
-cd cdktf.out/stacks/infra
-terraform apply
+az login                         # tenant/subscription as named in main.ts
+./Initialize-Platform.ps1        # once: resource group, terraform state account, registry, own data roles
+./Prepare-Artifacts.ps1          # worker image -> registry, identity provider zip
+$env:TS_NODE_PREFER_TS_EXTS='true'; npx cdktf synth
+cd cdktf.out/stacks/infra; terraform init; terraform apply
+# once: P-256 PEM into secret idp-signing-key of kv-dbote-idp-cmdev
 ```
+
+The test stack lives in subscription `998590b9-…` (tenant `5a6e4bb8-…`), region `swedencentral`,
+next to the SAPId admin tool.
 
 **What Gets Deployed**:
 - Azure Service Bus namespace

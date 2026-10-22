@@ -82,7 +82,7 @@ export class DboteIdentityProvider extends Construct {
             servicePlanId: functionServicePlan.id,
 
             runtimeName: 'dotnet-isolated',
-            runtimeVersion: '8.0',
+            runtimeVersion: '10.0',
             instanceMemoryInMb: 512,
             storageContainerType: 'blobContainer',
             storageAuthenticationType: 'SystemAssignedIdentity',
