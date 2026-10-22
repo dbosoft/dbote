@@ -117,7 +117,7 @@ namespace Dbosoft.Bote.BoteWorker
 
             // Generate URI - short-lived and read-only. The client only reads its attachment;
             // it never deletes (per-tenant blobs are shared across a tenant's clients, and the
-            // H4c TTL policy reaps them), so a Delete capability here would be unused and unsafe.
+            // TTL policy on the containers reaps them), so a Delete capability here would be unused and unsafe.
             var uri = blobClient.GenerateBlobSasUri(
                 BlobSasPermissions.Read,
                 DateTimeOffset.UtcNow.AddHours(1));

@@ -101,9 +101,8 @@ cloud's and the client's side and hands out short-lived SAS URIs.
 
 ### Further reading
 
-- [docs/worker-configuration.md](docs/worker-configuration.md) - worker settings, fixed names, client naming
+- [docs/worker-configuration.md](docs/worker-configuration.md) - worker settings, the resources it expects, client and attachment naming
 - [docs/cloud-without-rebus.md](docs/cloud-without-rebus.md) - cloud side without Rebus, wire format
-- [docs/architecture-review.md](docs/architecture-review.md) - review findings and their status
 - [docs/databus-concept.md](docs/databus-concept.md) - DataBus concept
 
 ## Important Technical Decisions

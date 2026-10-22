@@ -1,176 +1,159 @@
-# BoteWorker configuration contract
+# Configuring the BoteWorker
 
-The **BoteWorker** is a *generic* gateway. It contains no application-specific
-logic — application logic lives in the cloud-side Rebus handlers and in the edge
-clients, not in the worker. An application therefore adopts the worker **purely
-through configuration**: the same worker container image is deployed once per
-application, pointed at that application's own infrastructure. No code change and
-no rebuild are required to onboard a new application.
+The BoteWorker is the gateway between an application's cloud side and its clients. It holds no
+application logic, so every application runs the same worker image and only configures it: which
+Service Bus namespace, storage account, SignalR service and identity provider it works with.
 
-This document is the worker's **public configuration surface** — the contract an
-adopting application must satisfy.
+## Deployment model
 
-## Deployment model (who owns what)
+One worker deployment serves one application (one SaaS product) and all of its tenants. The
+application brings its own Service Bus namespace, storage account, Azure SignalR service and
+identity provider; the worker settings point at those. Tenants share the deployment and are kept
+apart by the worker: every client has queues of its own, and every message carries the tenant and
+client the worker took from the client's token.
 
-Per `CLAUDE.md` → *Deployment Model* → **"Shared Infrastructure (One per SaaS
-Product)"**:
+The reference deployment in `infra/` (`infra/core/dbote-gateway.ts`) creates all of this for one
+application and is the easiest way to see a complete configuration.
 
-- **One application (SaaS product) = one worker deployment**, with its **own**
-  Service Bus namespace, Storage account, Azure SignalR service and identity
-  provider. Every `dbote:Worker:*` key below points at *that* product's resources.
-- **Multi-tenancy happens *inside* one deployment** via per-client queues
-  (`{Storage:Prefix}-{key}`, see [Client names](#client-names)), created on demand.
-- Nothing is shared across applications, so the worker's **fixed** resource names
-  (see [Fixed names](#fixed-names-not-configurable)) never collide between
-  applications — each product has its own storage account and namespace.
+## How settings are read
 
-```
-one generic image  ──deploy N times, one per product──►  product A infra (SB / Storage / SignalR / IdP)
-                                                          product B infra (…)
-                                                          product C infra (…)
-```
+Standard .NET configuration: app settings or environment variables of the container app, then,
+if configured, Azure App Configuration on top (later wins). In environment variables `:` is written
+as `__`, e.g. `dbote__Worker__ServiceBus__Connection`.
 
-## Configuration resolution
+## Functions host
 
-Configuration is standard .NET configuration, resolved in this order (later wins):
-
-1. **Environment variables / app settings** on the Function/Container app.
-2. **Azure App Configuration** overlay — *if* the bootstrap keys in
-   [section B](#b-azure-app-configuration-bootstrap-optional) are set. In
-   production this is where the whole `dbote:Worker:*` tree lives, keeping the
-   image itself free of product config.
-
-Keys are written with `:` separators here. As environment variables use `__`
-(double underscore), e.g. `dbote:Worker:ServiceBus:Connection` →
-`dbote__Worker__ServiceBus__Connection`.
-
----
-
-## A. Platform / Functions-host settings
-
-Required by the Azure Functions host itself (not `dbote:*`-namespaced).
-
-| Key | Required | Meaning |
+| Setting | Required | Meaning |
 | --- | --- | --- |
-| `FUNCTIONS_WORKER_RUNTIME` | yes | Must be `dotnet-isolated`. |
-| `AzureWebJobsStorage` | yes\* | Functions host storage **and** the `databus-copy-monitor` queue trigger + its Base64 `QueueServiceClient`. \*With managed identity, leave empty and set `AzureWebJobsStorage__accountName` (+ role assignments) instead. May be a **different** account from `dbote:Worker:Storage:Connection`. |
-| `AzureWebJobsSecretStorageType` | prod | `keyvault` in production (function keys are not scoped per app — use a dedicated Key Vault). |
-| `AzureWebJobsSecretStorageKeyVaultUri` | prod | Key Vault URI for the above. |
-| `APPLICATIONINSIGHTS_CONNECTION_STRING` | recommended | Application Insights telemetry (also settable via the host `siteConfig`). |
+| `FUNCTIONS_WORKER_RUNTIME` | yes | `dotnet-isolated` |
+| `AzureWebJobsStorage` | yes | Storage of the Functions host. It also holds the worker's `databus-copy-monitor` queue. With a managed identity set `AzureWebJobsStorage__accountName` instead. May be a different account from the gateway storage below. |
+| `AzureWebJobsSecretStorageType` | in Azure | `keyvault`. The host keeps its keys there, among them the key SignalR calls the worker with; the default file storage of container apps loses them when the worker scales to zero. |
+| `AzureWebJobsSecretStorageKeyVaultUri` | in Azure | The key vault for the above, one per worker. |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | recommended | Application Insights. |
 
-> **Gotcha:** any queue used with `[QueueTrigger]` (here `databus-copy-monitor`)
-> must be created with the **Base64-encoded** `AzureWebJobsStorage` client, or
-> messages silently poison after 5 attempts. This is already wired in `Program.cs`
-> (named `AzureWebJobsStorage` client with `MessageEncoding = Base64`).
+## Azure App Configuration (optional)
 
-## B. Azure App Configuration bootstrap (optional)
+With one of these set, the worker loads its `dbote:Worker:*` settings from an App Configuration
+store, so the container app itself carries only the bootstrap settings.
 
-If set, the worker loads its `dbote:Worker:*` tree from an Azure App
-Configuration store at startup (`AddDboteAzureAppConfiguration`,
-`src/Dbosoft.Bote.AppConfiguration/ConfigurationBuilderExtensions.cs`). If
-**neither** `Endpoint` nor `Connection` is set, this layer is skipped and the
-`dbote:Worker:*` keys must be provided directly (section C).
+| Setting | Meaning |
+| --- | --- |
+| `dbote:AppConfiguration:Endpoint` | Store endpoint, read with the worker's managed identity. |
+| `dbote:AppConfiguration:Connection` | Store connection string, instead of `Endpoint` (not both). |
+| `dbote:AppConfiguration:Environment` | Label to read, e.g. `dev` or `prod`. |
+| `dbote:AppConfiguration:Prefix` | Key prefix to read, e.g. `dbote:Worker`. |
 
-| Key | Required | Meaning |
-| --- | --- | --- |
-| `dbote:AppConfiguration:Endpoint` | one of | App Configuration endpoint URI (uses managed identity / `DefaultAzureCredential`). |
-| `dbote:AppConfiguration:Connection` | one of | App Configuration connection string. **Mutually exclusive** with `Endpoint` — setting both throws. |
-| `dbote:AppConfiguration:Environment` | if used | Label to select (the deployment environment, e.g. `dev`/`prod`). |
-| `dbote:AppConfiguration:Prefix` | if used | Key prefix to select, e.g. `dbote:Worker`. |
-
-## C. The `dbote:Worker:*` contract (per application)
-
-Every key here points at the adopting application's **own** resources.
+## Worker settings
 
 ### Service Bus (`dbote:Worker:ServiceBus`)
 
-| Key | Required | Meaning |
+| Setting | Required | Meaning |
 | --- | --- | --- |
-| `…:Connection` | yes | Service Bus namespace connection. **Standard SKU** required (scheduled messages / defer). For managed identity use the `…:Connection:fullyQualifiedNamespace` form instead of a secret. |
-| `…:Queues:Clients` | yes | Shared cloud→client queue. Also the source of the `ServiceBusReceivedMessageFunction` trigger. A client's message to its own queue `{Clients}-{clientId}` (how Rebus defers a message) goes through this queue back to the client. |
-| `…:Queues:Cloud` | yes | client→cloud target queue: the inbound queue of the cloud side, a Rebus endpoint or a receiver built on `Dbosoft.Bote.Cloud` (see [cloud-without-rebus.md](cloud-without-rebus.md)). |
-| `…:Queues:CloudIncoming` | yes | Worker-internal requeue/monitor queue: inbound messages whose DataBus attachment is not yet copied are parked here and re-checked by `CloudIncomingMonitor`. |
-| `…:Queues:Error` | no | **Not used by the worker** — this is the cloud service's Rebus error queue. Present in the shared options type for convenience; safe to omit for the worker. |
+| `Connection` | yes | The namespace, Standard tier or higher (scheduled messages). With a managed identity: `Connection:fullyQualifiedNamespace`. |
+| `Queues:Clients` | yes | The one queue the cloud side sends to for all clients. The worker delivers from here to each client's storage queue. |
+| `Queues:Cloud` | yes | Where the worker puts what clients send: the cloud side's input queue, a Rebus endpoint or a receiver built on `Dbosoft.Bote.Cloud` ([cloud-without-rebus.md](cloud-without-rebus.md)). Create it with duplicate detection. |
+| `Queues:CloudIncoming` | yes | The worker's own queue for client messages whose attachment is still being copied. |
 
 ### Storage (`dbote:Worker:Storage`)
 
-| Key | Required | Meaning |
+| Setting | Required | Meaning |
 | --- | --- | --- |
-| `…:Connection` | yes | Storage account for the data planes the worker uses: per-tenant **queues**, subscription **table**, and DataBus **blob** containers. Also the connection of the `CloudOutboxBlobDetected` blob trigger on `bote-outbox`, so the cloud side stages outgoing attachments here. With a managed identity, set `…:Connection:blobServiceUri`, `…:Connection:queueServiceUri` and `…:Connection:tableServiceUri` (the blob trigger does not read `serviceUri`) and give the identity Storage Blob Data Owner; not yet run in Azure, the reference infra passes a connection string. |
-| `…:Prefix` | no (default `bote`) | Prefix of the client queue names → `{Prefix}-{key}` (+ `-error`). Lowercase letters, digits and single hyphens, at most 24 characters; checked at startup. Use a distinct prefix if several deployments ever share one account. |
+| `Connection` | yes | The gateway storage: the clients' queues, the topic subscriptions table and the attachment containers. The cloud side stages outgoing attachments here as well. With a managed identity: `Connection:blobServiceUri`, `Connection:queueServiceUri` and `Connection:tableServiceUri` (the blob trigger does not read `serviceUri`); this form has not run in Azure yet, the reference deployment uses a connection string. |
+| `Prefix` | no, default `bote` | Start of the clients' queue names. Lowercase letters, digits and single hyphens, at most 24 characters; the worker refuses to start otherwise. |
 
 ### SignalR (`dbote:Worker:SignalR`)
 
-| Key | Required | Meaning |
+| Setting | Required | Meaning |
 | --- | --- | --- |
-| `…:Connection` | yes | Azure SignalR service connection. **Must be in Serverless mode**, with an upstream endpoint pointing at the worker's `/runtime/webhooks/signalr` endpoint. Managed identity is supported. |
+| `Connection` | yes | The Azure SignalR service, in Serverless mode. With a managed identity: `Connection:serviceUri`. |
 
-### Identity / OpenID (`dbote:Worker:OpenId`)
+The service needs an upstream to the worker: `https://<worker>/runtime/webhooks/signalr?code=<key>`,
+where the key is the host's `signalr_extension` system key. The reference deployment keeps the URL
+as a Key Vault reference, which SignalR resolves with its own identity.
 
-Validates the client access tokens (`TokenValidationService`, `BoteHub.negotiate`).
+### Identity provider (`dbote:Worker:OpenId`)
 
-| Key | Required | Meaning |
+| Setting | Required | Meaning |
 | --- | --- | --- |
-| `…:Authority` | yes | Token authority / issuer base URL of the application's identity provider. |
-| `…:JwksUri` | yes | JWKS endpoint used to validate token signatures. |
-| `…:Audience` | yes | Expected `aud` of client tokens. |
-| `…:RequiredScope` | yes | Scope every client token must carry (checked on negotiate). |
+| `Authority` | yes | Issuer of the client tokens. |
+| `JwksUri` | yes | Where the issuer's signing keys are published. |
+| `Audience` | yes | The audience the tokens must name. |
+| `RequiredScope` | yes | The scope a token must carry, exactly; without it the worker refuses every client. |
 
-> Token claims consumed: `sub` → client id, `tid` → tenant id, `scope`. The
-> included `BasicIdentityProvider` is **dev-only**; a production application
-> supplies its own OIDC provider by setting the four keys above.
+The worker takes the client from `sub` and the tenant from `tid`. It accepts ES256 tokens only,
+reloads the keys when a token names an unknown key (at most every 30 seconds) and keeps using the
+known keys while the issuer is unreachable. Tenant and client ids must not contain `/`, `\` or
+control characters, nor be `.` or `..`. `BasicIdentityProvider` is for development; an application
+brings its own issuer.
 
----
+## Resources the worker expects
 
-## Fixed names (not configurable)
-
-Safe to hardcode because of the one-deployment-per-application isolation model:
-
-| Name | Where | Purpose |
+| Name | In | Purpose |
 | --- | --- | --- |
-| `databus-copy-monitor` | `AzureWebJobsStorage` queue | Blob-copy monitor queue trigger (Base64). |
-| `bote-outbox` / `bote-inbox` | `Storage:Connection` blob containers | DataBus claim-check staging (`BoteStorageConstants`). Create them with the account: the outbox blob trigger needs its container from the start. |
-| `{Storage:Prefix}-{key}` (+ `-error`) | `Storage:Connection` queues | Per-client queues, created on demand. |
+| `Queues:Clients`, `Queues:Cloud`, `Queues:CloudIncoming` | Service Bus | As above. |
+| `bote-outbox`, `bote-inbox` | gateway storage, blob containers | Attachments from the cloud side, and for it. Create them with the account: the worker's blob trigger on `bote-outbox` and its scaler fail without it. |
+| `databus-copy-monitor` | `AzureWebJobsStorage`, queue | Copies of attachments still in progress. Create it with the account for the same reason. |
+| `subscriptions` | gateway storage, table | Topic subscriptions, created on first use. |
+| `{Prefix}-ds` | gateway storage, blob container | The clients' attachments, created on first use. |
+| client queues | gateway storage | Created on first use, see below. |
 
-## Client names
+A lifecycle policy that deletes attachment blobs after a few days is expected; the worker deletes
+what it has copied, but a message that is retried has to find its attachment again, so nothing
+deletes an attachment the moment it is read.
 
-Everything the worker keeps per client is named after a key, not after the ids joined together
-(`BoteClientNames` in `Dbosoft.Bote.Primitives`):
+## What the worker keeps per client
 
-- **key** = the first 128 bits of SHA-256 over the tenant id (length-prefixed) and the client id,
-  as 32 lowercase hex characters. Joining the ids with `-` let `a-b`/`c` and `a`/`b-c` share a
-  queue, and a client named `c-error` read the error queue of `c`; a hash also fits any ids
-  (GUIDs included) into the 63 characters of a queue name.
-- client queue `{Prefix}-{key}`, its error queue `{Prefix}-{key}-error`, SignalR user `{key}`,
-  subscriptions table partition = key of tenant and topic, row = key of the client.
-- Tenant and client ids must not contain `/`, `\` or control characters, nor be `.` or `..`:
-  the tenant also names the DataBus folder `{tenant}/{attachment}`. The worker refuses other ids
-  at negotiate.
-- The names are opaque; to find a client's queue, compute `BoteClientNames.ClientQueueName`.
-  Changing the scheme orphans every client's queue and subscriptions (`The_key_is_stable` pins it).
+Per client the worker keeps a storage queue, an error queue, a SignalR user and its topic
+subscriptions. All are named after a key derived from tenant and client (`BoteClientNames` in
+`Dbosoft.Bote.Primitives`): the first 128 bits of SHA-256 over the length-prefixed tenant id and
+the client id, as 32 hex characters. The ids are never joined directly, so no two clients share a
+name, and any ids, GUIDs included, fit the 63 characters of a queue name.
 
-## Managed identity
+| What | Name |
+| --- | --- |
+| client queue | `{Prefix}-{key}` |
+| error queue | `{Prefix}-{key}-error` |
+| SignalR user | `{key}` |
+| subscriptions | partition = key of tenant and topic, row = key of the client |
 
-`Program.cs` uses `DefaultAzureCredential` for all Azure SDK clients, so in
-production nothing needs a secret: Service Bus, Storage (queue/table/blob),
-SignalR and App Configuration all accept the identity-based connection forms
-(`…:fullyQualifiedNamespace`, `…:serviceUri`, `Endpoint`), and the function
-identity needs the corresponding data-plane roles on each resource (see
-`infra/core/dbote-gateway.ts` and `infra/core/dbote-worker.ts` for the reference role assignments).
+The names are not readable; `BoteClientNames.ClientQueueName(prefix, tenant, client)` gives a
+client's queue. Changing how the key is derived would orphan every client's queues and
+subscriptions; a test pins it.
 
-## Adoption checklist (new application)
+Attachments lie in folders of their tenant:
 
-1. Provision the product's own: Service Bus namespace (**Standard**), Storage
-   account, Azure SignalR (**Serverless**, upstream → worker), identity provider.
-2. Deploy the worker image; grant its identity the data-plane roles.
-3. Set section A (host) settings.
-4. Either set section B (point at App Configuration) **or** provide the section C
-   `dbote:Worker:*` keys directly.
-5. Configure the SignalR upstream to the worker's `/runtime/webhooks/signalr`.
+| Container | Path | What |
+| --- | --- | --- |
+| `{Prefix}-ds` | `{tenant}/{attachment}` | attachments the cloud sent; any client of the tenant may read one whose id it knows |
+| `{Prefix}-ds` | `{tenant}/upload/{key}/{attachment}` | a client's uploads |
+| `bote-inbox` | `{tenant}/{key}/{attachment}` | a client's attachments, copied for the cloud |
+| `bote-outbox` | `{tenant}/{attachment}` | what the cloud side stages for its clients |
 
-## Known dead config (cleanup candidates)
+A client writes only below its own key, so it cannot overwrite another client's attachments.
+Attachment ids are checked like tenant ids before they become part of a path.
 
-- `dbote:Worker:ServiceBus:Queues:Events` — appears in `local.settings.json` and
-  some compose files but has **no** property on `ServiceBusQueuesOptions` and is
-  never read. Unbound/ignored.
-- `dbote:Worker:ServiceBus:Queues:Error` — bound but unused by the worker (see above).
+## Roles for a managed identity
+
+What the reference deployment grants the worker's identity:
+
+| Resource | Role |
+| --- | --- |
+| Service Bus namespace | Azure Service Bus Data Owner |
+| gateway storage | Storage Queue Data Contributor, Storage Table Data Contributor, Storage Blob Data Owner |
+| Functions host storage | Storage Blob, Queue and Table Data Contributor |
+| the worker's key vault | Key Vault Secrets Officer |
+| SignalR | SignalR Service Owner |
+| App Configuration | App Configuration Data Reader |
+| container registry | AcrPull (a user-assigned identity) |
+
+SignalR's own identity needs Key Vault Secrets User on the worker's key vault to resolve the
+upstream URL. The rights the cloud side needs are in [cloud-without-rebus.md](cloud-without-rebus.md).
+
+## Setting up a new application
+
+1. Create the Service Bus namespace with the three queues, the gateway storage with `bote-outbox`
+   and `bote-inbox`, a SignalR service in Serverless mode, a key vault, and an identity provider.
+2. Deploy the worker image as a container app (`kind=functionapp`) with the host settings and the
+   worker settings, directly or through App Configuration; grant its identity the roles above.
+3. Point SignalR's upstream at the worker.
+4. Give the cloud side send rights on `Queues:Clients` and receive rights on `Queues:Cloud`.

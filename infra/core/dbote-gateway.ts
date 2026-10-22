@@ -188,7 +188,7 @@ export class DboteGateway extends Construct {
             name: 'subscriptions',
         });
 
-        // DataBus attachment lifecycle (H4c). Attachments are staged as blobs and copied
+        // DataBus attachment lifecycle. Attachments are staged as blobs and copied
         // between the outbox/inbox/client-datastore containers. Success paths delete their
         // source blob eagerly, but the remaining orphan classes cannot be deleted inline:
         //   - failed/partial copies (a retried message must still find its attachment), and

@@ -13,7 +13,7 @@ using Rebus.Transport;
 namespace Dbosoft.Bote.Rebus.IntegrationTests;
 
 /// <summary>
-/// Guards the H4a fix: the cloud outgoing DataBus step must stage the attachment in the
+/// Guards that the cloud outgoing DataBus step must stage the attachment in the
 /// outbox synchronously and fail the send if that upload fails - never let the message
 /// (which references the attachment) be sent while the attachment is missing.
 /// </summary>

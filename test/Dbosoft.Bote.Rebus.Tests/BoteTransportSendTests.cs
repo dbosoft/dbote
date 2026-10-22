@@ -10,7 +10,7 @@ using Rebus.Transport;
 
 namespace Dbosoft.Bote.Rebus.Tests;
 
-// Guards the H1 contract: the client->cloud path must be honest about send failures
+// Guards the contract: the client->cloud path must be honest about send failures
 // (so Rebus retries instead of silently dropping) and must carry a stable message id
 // (so Azure Service Bus duplicate detection can suppress the retries' duplicates).
 public class BoteTransportSendTests

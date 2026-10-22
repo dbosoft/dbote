@@ -296,7 +296,7 @@ internal partial class BoteHub
         // Short-lived: this SAS travels inside the message (ASB application property) and would
         // otherwise sit in the DLQ / telemetry as a long-lived delete capability. It is minted
         // only once the attachment is Ready and is consumed by the cloud's DataBusIncomingStep
-        // shortly after; two hours is generous headroom. The H4c TTL policy reaps the blob.
+        // shortly after; two hours is generous headroom. The containers' TTL policy reaps the blob.
         var sasUri = blobClient.GenerateSasUri(
             BlobSasPermissions.Read | BlobSasPermissions.Delete,
             DateTimeOffset.UtcNow.AddHours(2));

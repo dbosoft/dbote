@@ -59,4 +59,4 @@ Service Bus, Storage, SignalR and a real identity provider (config only). Scalin
 - **EdgeLoad** → run as container replicas (e.g. Container Instances / a job) to reach thousands
   of edges; each replica hosts a slice of the edge population.
 - Per-tenant fairness/sharding at that scale is an application concern the Service Bus choice
-  enables (sessions / hash queues / dedicated queues) — see `docs/architecture-review.md` H6.
+  enables (sessions / hash queues / dedicated queues).

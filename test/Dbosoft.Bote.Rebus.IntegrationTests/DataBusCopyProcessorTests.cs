@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Dbosoft.Bote.Rebus.IntegrationTests;
 
 // Covers the DataBus copy state machine's decision logic against a real storage backend
-// (Azurite): the idempotency short-circuit when the destination already exists (H4b) and
+// (Azurite): the idempotency short-circuit when the destination already exists and
 // the fail-fast when the source is gone.
 //
 // Note: the actual server-side copy-from-URL is NOT exercised here - Azurite runs in a

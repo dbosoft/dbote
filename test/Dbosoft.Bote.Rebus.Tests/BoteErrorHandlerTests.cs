@@ -9,7 +9,7 @@ using Rebus.Transport;
 
 namespace Dbosoft.Bote.Rebus.Tests;
 
-// Guards the H2 contract: client-side poison messages go to the client's local error
+// Guards the contract: client-side poison messages go to the client's local error
 // queue (not back through the SignalR SendMessage whitelist, which would reject the
 // error queue and silently drop or infinitely re-loop the message).
 public class BoteErrorHandlerTests

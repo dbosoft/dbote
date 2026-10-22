@@ -10,7 +10,7 @@ namespace Dbosoft.Bote.BoteWorker.Services;
 /// <summary>
 /// Default implementation that uses centralized storage accounts for all tenants.
 /// Azure Storage clients are thread-safe and hold a connection pool, so they are cached and
-/// reused rather than re-created on every resolve (N2) - at 1000+ tenants with a high call
+/// reused rather than re-created on every resolve - at 1000+ tenants with a high call
 /// rate, constructing a fresh client per call is avoidable overhead.
 /// </summary>
 public class DefaultTenantStorageResolver(IOptions<ClientStorageOptions> options) : ITenantStorageResolver

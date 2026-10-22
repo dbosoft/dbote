@@ -106,7 +106,7 @@ public class DataBusCopyProcessor(
 
         logger.LogInformation("starting copy for attachment {AttachmentId}: {Source} to {Destination}",
             request.AttachmentId, sourceBlob.Name, destBlob.Name);
-        // Idempotency (H4b): the blob trigger is at-least-once and the inline/monitor paths can
+        // Idempotency: the blob trigger is at-least-once and the inline/monitor paths can
         // re-run. A re-delivered request usually finds the destination already present above and
         // returns completed without re-copying. For a truly concurrent duplicate that both pass
         // the exists-check, Azure Storage returns 409 on the second Copy Blob because the

@@ -3,7 +3,7 @@ using Dbosoft.Bote.Primitives;
 
 namespace Dbosoft.Bote.Rebus.IntegrationTests;
 
-// Guards the H5a trust-boundary allow-list: a client may only set rbs2-*/non-dbote headers
+// Guards the trust-boundary allow-list: a client may only set rbs2-*/non-dbote headers
 // plus dbote-attachment-id; every other worker-controlled dbote-* header is a spoof attempt.
 public class BoteHeaderPolicyTests
 {

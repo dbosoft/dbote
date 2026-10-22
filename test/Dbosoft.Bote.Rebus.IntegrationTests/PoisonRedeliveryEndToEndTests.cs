@@ -14,13 +14,13 @@ using Rebus.Serialization.Json;
 namespace Dbosoft.Bote.Rebus.IntegrationTests;
 
 /// <summary>
-/// End-to-end guard for the coupled H2 (local dead-letter queue) and H3 (retry redelivery)
+/// End-to-end guard for the local dead-letter queue and the retry redelivery
 /// fixes, exercised against a real Azure Storage Queue (Azurite):
 ///
 /// A message whose handler always fails must be redelivered until Rebus reaches its max
-/// delivery count (proves the transport re-arms polling after a NACK - H3c) and then land
+/// delivery count (proves the transport re-arms polling after a NACK) and then land
 /// in the client's own local error queue with the error details (proves the Bote error
-/// handler writes poison to the edge queue instead of the rejected SignalR path - H2).
+/// handler writes poison to the edge queue instead of the rejected SignalR path).
 ///
 /// The real BoteTransport, BoteErrorHandler and Rebus pipeline run; only the worker's SAS
 /// issuance is stood in for by <see cref="StorageQueueSignalRClient"/>, which hands out real
@@ -69,7 +69,7 @@ public class PoisonRedeliveryEndToEndTests
 
         poison.Should().NotBeNull("the poison message must be dead-lettered to the local error queue");
 
-        // Redelivered at least once before dead-lettering => the retry loop was not stranded (H3c).
+        // Redelivered at least once before dead-lettering => the retry loop was not stranded.
         handleCount.Should().BeGreaterThanOrEqualTo(2);
 
         using var doc = JsonDocument.Parse(poison!);

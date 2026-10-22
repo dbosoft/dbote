@@ -3,7 +3,7 @@ using Dbosoft.Bote.Primitives;
 
 namespace Dbosoft.Bote.Rebus.IntegrationTests;
 
-// Guards the H5b SSRF defense: the cloud only fetches an inbox attachment from its own
+// Guards the SSRF defense: the cloud only fetches an inbox attachment from its own
 // storage endpoint, never an arbitrary host carried in the SAS header.
 public class DataBusSasUriValidatorTests
 {

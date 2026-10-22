@@ -3,7 +3,7 @@ using Dbosoft.Bote.Primitives;
 
 namespace Dbosoft.Bote.Rebus.IntegrationTests;
 
-// Guards the H6a broadcast fan-out: bounded parallelism, per-subscriber failure isolation,
+// Guards the broadcast fan-out: bounded parallelism, per-subscriber failure isolation,
 // and no aborting the whole broadcast when a single subscriber fails.
 public class BroadcastFanOutTests
 {
