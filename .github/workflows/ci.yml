@@ -31,6 +31,7 @@ jobs:
         run: |
           dotnet test test/Dbosoft.Bote.Rebus.Tests/Dbosoft.Bote.Rebus.Tests.csproj -c Release
           dotnet test test/Dbosoft.Bote.Client.KeyGenerator.Tests/Dbosoft.Bote.Client.KeyGenerator.Tests.csproj -c Release
+          dotnet test test/Dbosoft.Bote.BoteWorker.Tests/Dbosoft.Bote.BoteWorker.Tests.csproj -c Release
 
       # Integration tests use Testcontainers to start a real Azurite. GitHub-hosted Linux
       # runners have Docker available, so no DOCKER_HOST / Ryuk overrides are needed (unlike

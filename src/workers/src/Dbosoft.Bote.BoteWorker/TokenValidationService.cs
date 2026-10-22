@@ -19,6 +19,7 @@ public class TokenValidationService : ITokenValidationService
     private readonly HttpClient _httpClient;
     private readonly IOptions<OpenIdOptions> _options;
     private readonly ILogger<TokenValidationService> _logger;
+    private readonly TimeProvider _timeProvider;
     private JsonWebKeySet? _cachedKeySet;
     private DateTime _cacheExpiration = DateTime.MinValue;
     private DateTime _lastFetch = DateTime.MinValue;
@@ -27,11 +28,13 @@ public class TokenValidationService : ITokenValidationService
     public TokenValidationService(
         IHttpClientFactory httpClientFactory,
         IOptions<OpenIdOptions> options,
-        ILogger<TokenValidationService> logger)
+        ILogger<TokenValidationService> logger,
+        TimeProvider? timeProvider = null)
     {
         _httpClient = httpClientFactory.CreateClient();
         _options = options;
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<TokenValidationResult> ValidateAccessToken(string jwt, CancellationToken cancellationToken = default)
@@ -44,7 +47,7 @@ public class TokenValidationService : ITokenValidationService
         var kid = TryGetKid(jwt);
         if (kid != null
             && signingKeys.All(k => !string.Equals(k.KeyId, kid, StringComparison.Ordinal))
-            && DateTime.UtcNow - _lastFetch > MinForcedRefreshInterval)
+            && Now - _lastFetch > MinForcedRefreshInterval)
         {
             _logger.LogInformation("Token kid {Kid} not in cached JWKS; forcing a refresh", kid);
             signingKeys = await GetSigningKeys(forceRefresh: true, cancellationToken);
@@ -78,7 +81,7 @@ public class TokenValidationService : ITokenValidationService
     private async Task<ICollection<SecurityKey>> GetSigningKeys(bool forceRefresh, CancellationToken cancellationToken)
     {
         // Check cache
-        if (!forceRefresh && _cachedKeySet != null && DateTime.UtcNow < _cacheExpiration)
+        if (!forceRefresh && _cachedKeySet != null && Now < _cacheExpiration)
         {
             _logger.LogTrace("Using cached JWKS");
             return _cachedKeySet.GetSigningKeys();
@@ -88,7 +91,7 @@ public class TokenValidationService : ITokenValidationService
         try
         {
             // Double-check after acquiring lock
-            if (!forceRefresh && _cachedKeySet != null && DateTime.UtcNow < _cacheExpiration)
+            if (!forceRefresh && _cachedKeySet != null && Now < _cacheExpiration)
             {
                 return _cachedKeySet.GetSigningKeys();
             }
@@ -106,8 +109,8 @@ public class TokenValidationService : ITokenValidationService
                 // Fetch JWKS using standard Microsoft.IdentityModel library
                 var jwksJson = await _httpClient.GetStringAsync(jwksUri, cancellationToken);
                 _cachedKeySet = new JsonWebKeySet(jwksJson);
-                _cacheExpiration = DateTime.UtcNow.AddHours(1); // Cache for 1 hour to allow key rotation
-                _lastFetch = DateTime.UtcNow;
+                _cacheExpiration = Now.AddHours(1); // Cache for 1 hour to allow key rotation
+                _lastFetch = Now;
 
                 _logger.LogInformation("JWKS refreshed from {JwksUri}, found {KeyCount} keys", jwksUri, _cachedKeySet.Keys.Count);
             }
@@ -126,6 +129,8 @@ public class TokenValidationService : ITokenValidationService
             _refreshLock.Release();
         }
     }
+
+    private DateTime Now => _timeProvider.GetUtcNow().UtcDateTime;
 
     private static string? TryGetKid(string jwt)
     {

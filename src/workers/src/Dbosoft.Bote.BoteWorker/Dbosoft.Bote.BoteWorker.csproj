@@ -35,5 +35,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Dbosoft.Bote.Rebus.IntegrationTests" />
+    <InternalsVisibleTo Include="Dbosoft.Bote.BoteWorker.Tests" />
   </ItemGroup>
 </Project>

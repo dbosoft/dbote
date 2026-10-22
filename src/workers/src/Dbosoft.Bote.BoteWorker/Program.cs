@@ -44,6 +44,7 @@ builder.Services.AddSingleton<ServiceBusSenderCache>();
 builder.Services.AddSingleton<IMessageConverter, MessageConverter>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ITokenValidationService, TokenValidationService>();
+builder.Services.AddSingleton<NegotiateAuthorizer>();
 
 // DataBus support - tenant storage resolution
 builder.Services.AddSingleton<ITenantStorageResolver, DefaultTenantStorageResolver>();
