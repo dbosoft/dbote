@@ -1,57 +1,110 @@
 # dbote
 
-## Local Development
+dbosoft bote is a multi-tenant messaging gateway between a cloud application on Azure Service Bus
+and clients on customer premises. The clients only need HTTPS: they receive through Azure Storage
+Queues and are notified through Azure SignalR, so they neither poll empty queues nor need AMQP or a
+VPN. A shared worker (Azure Functions) sits in between as the security boundary: it authenticates
+the clients, sets their verified tenant and client on every message and keeps the tenants apart.
 
-### Prerequisites
-- Docker Desktop
-- .NET 8 SDK
-
-### Starting the Development Environment
-
-The project uses Docker Compose to run all required emulators and services:
-
-```bash
-docker-compose up -d
+```
+cloud (Rebus or Azure Functions) ──Service Bus──► BoteWorker ──Storage Queue + SignalR──► client (Rebus)
+cloud ◄──Service Bus── BoteWorker ◄──SignalR── client
 ```
 
-This starts the following services:
+## Packages
 
-- **Azure Service Bus Emulator** - Ports 5672 (AMQP), 5300 (HTTP)
-- **SQL Server** - Port 1433
-- **Azurite (Storage Emulator)** - Ports 10000 (Blob), 10001 (Queue), 10002 (Table)
-  - Connection string: `UseDevelopmentStorage=true`
-- **Azure SignalR Emulator** - Port 8888
-- **Basic Identity Provider** - Port 7071
-  - Token endpoint: `POST http://localhost:7071/token`
-  - JWKS endpoint: `GET http://localhost:7071/.well-known/jwks.json`
+The libraries are published to the dbosoft Public feed
+(`https://pkgs.dev.azure.com/dbosoft/public/_packaging/Public/nuget/v3/index.json`): every build of
+`main` as `X.Y.Z-ci.N`, a release from a `vX.Y.Z` tag (`azure-pipelines.yml`, versions from
+GitVersion).
+
+| Package | For |
+| --- | --- |
+| `Dbosoft.Bote.Rebus` | Clients: the Rebus transport over Storage Queues and SignalR, DataBus |
+| `Dbosoft.Bote.Client.Authentication`, `Dbosoft.Bote.Client.Options` | Clients: signed client assertions, settings |
+| `Dbosoft.Bote.Rebus.Integration` | Cloud side on Rebus: `.EnableBote()`, `.EnableBoteDataBus()` |
+| `Dbosoft.Bote.Cloud` | Cloud side without Rebus, e.g. Azure Functions ([docs/cloud-without-rebus.md](docs/cloud-without-rebus.md)) |
+| `Dbosoft.Bote.Primitives` | Wire format, header policy, queue and attachment naming shared by all of the above |
+| `Dbosoft.Bote.Options`, `Dbosoft.Bote.AppConfiguration`, `Dbosoft.Bote.Transport.Abstractions`, … | Shared settings and contracts |
+
+The worker itself is not a package but a container image (`src/workers/src/Dbosoft.Bote.BoteWorker`),
+one generic image for every application; its settings are in
+[docs/worker-configuration.md](docs/worker-configuration.md).
+
+## Local development
+
+### Prerequisites
+- .NET 10 SDK
+- Docker or Podman (with `podman compose`)
+
+### Emulators
+
+```bash
+docker compose up -d
+```
+
+starts the emulators the samples and the worker use:
+
+- **Azure Service Bus emulator** - 5672 (AMQP), 5300 (health), 80 (management API) and its SQL Server (1433)
+- **Azurite** - 10000 (Blob), 10001 (Queue), 10002 (Table); `UseDevelopmentStorage=true`
+- **Azure SignalR emulator** - 8888
+
+### Samples
+
+Each sample brings the worker and the BasicIdentityProvider along:
+
+- `samples/simple` - ping/pong, deferred messages and pushes; `./Start-Services.ps1 -Functions`
+  runs its cloud side as Azure Functions without Rebus
+- `samples/chat` - several clients per tenant, topic broadcasts, tenant isolation, attachments
+- `samples/loadtest` - many simulated clients, DataBus in both directions (`./Start-LoadTest.ps1 -Edges 30`)
+
+### Tests
+
+```bash
+dotnet test Dbote.sln
+```
+
+The integration tests start Azurite with Testcontainers; with Podman see `test/README.md`.
 
 ### Basic Identity Provider
 
-The BasicIdentityProvider is a simple sample implementation that demonstrates the token issuance pattern for client authentication. It:
+`src/workers/src/Dbosoft.Bote.BasicIdentityProvider` is a minimal reference identity provider for
+development and tests: it issues access tokens to clients that authenticate with a client
+assertion (a JWT signed with the client's ECDSA P-256 key) and publishes its keys as JWKS. It signs
+with a key from configuration (`BasicIdentityProvider:SigningKeyPem`, from Key Vault in Azure) or an
+ephemeral one. Registration is open to anyone. Production deployments use their own identity
+provider; the worker only needs its issuer, JWKS endpoint, audience and scope.
 
-- Issues access tokens for clients using OAuth 2.0 Client Credentials flow
-- Validates client client assertions (JWT signed with client's private key)
-- Exposes a JWKS endpoint for public key discovery
-- Uses an ephemeral ECDSA P-256 key (generated on startup)
+## Azure
 
-**Note:** This is a minimal reference implementation. Production deployments should use a separate identity/auth service with:
-- Persistent keys stored in Azure Key Vault
-- Caching with Redis
-- Proper key rotation
-- Integration with organization/tenant management
-
-The dbote Worker validates tokens from the BasicIdentityProvider by fetching public keys from its JWKS endpoint.
+`infra/` deploys a test environment with CDKTF: the gateway as a reusable construct library
+(`infra/core`, `@dbosoft/bote-infra`) and the samples on top of it. See [infra/README.md](infra/README.md).
 
 ## Design
 
 ### Flow of a message
 
 #### Cloud -> Client
-1. Cloud: send message to `bote-clients-client1` with tenant header
-2. Rebus pipeline: attach client ID header
-3. Rebus ASB name formatter: change queue to `bote-clients`
-4. dbote worker: take message from `bote-clients` and copy it to Azure Queue Storage `bote-tenant1-client1`
-5. Client: fetch message from AQS `bote-tenant1-client-1`
+1. Cloud: sends to `{clients}-{clientId}` with the tenant header (Rebus), or with `BoteCloudSender`
+2. The Rebus name formatter redirects it to the single clients queue `bote-clients`
+3. Worker: takes it from `bote-clients` and writes it to the client's Storage Queue `{prefix}-{key}`,
+   key = a hash of tenant and client (`BoteClientNames`), then notifies the client through SignalR
+4. Client: fetches the message from its Storage Queue
+
+#### Client -> Cloud
+1. Client: sends through SignalR
+2. Worker: refuses tenant and client headers set by the client, sets them from the verified token
+   and forwards the message to the cloud queue
+
+Attachments (DataBus) travel as blobs next to the messages; the worker copies them between the
+cloud's and the client's side and hands out short-lived SAS URIs.
+
+### Further reading
+
+- [docs/worker-configuration.md](docs/worker-configuration.md) - worker settings, fixed names, client naming
+- [docs/cloud-without-rebus.md](docs/cloud-without-rebus.md) - cloud side without Rebus, wire format
+- [docs/architecture-review.md](docs/architecture-review.md) - review findings and their status
+- [docs/databus-concept.md](docs/databus-concept.md) - DataBus concept
 
 ## Important Technical Decisions
 

@@ -1,4 +1,4 @@
-# Builds the bote libraries (src/) and pushes them to the internal 'library' feed.
+# Builds the bote libraries (src/) and pushes them to the dbosoft Public feed.
 # Runs on main and on release tags (v*): a main build publishes X.Y.Z-ci.<n>, a tag the version in
 # its name. Pull requests are checked by the GitHub workflow (.github/workflows/ci.yml).
 trigger:
@@ -96,9 +96,9 @@ steps:
 
 # dotnet-based push (not NuGetCommand@2, whose NuGet.exe needs mono — absent on Ubuntu 24.04+).
 - task: DotNetCoreCLI@2
-  displayName: Push to the library feed
+  displayName: Push to the Public feed
   inputs:
     command: push
     packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg;!$(Build.ArtifactStagingDirectory)/**/*.symbols.nupkg'
     nuGetFeedType: internal
-    publishVstsFeed: '4612e84a-b54a-4afb-b7ce-afc8f25d1a1b'
+    publishVstsFeed: '59a3608a-9bed-4cb4-9467-6efaaa3cbef5/1e425ef4-e3a0-4927-b4c0-2beff753cb88'
