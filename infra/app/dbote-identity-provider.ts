@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { Environnment } from "../environment";
+import { Environnment } from "../core";
 import { StorageAccount } from "@cdktf/provider-azurerm/lib/storage-account";
 import { StorageContainer } from "@cdktf/provider-azurerm/lib/storage-container";
 import { StorageBlob } from "@cdktf/provider-azurerm/lib/storage-blob";

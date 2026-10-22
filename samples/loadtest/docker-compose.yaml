@@ -62,8 +62,6 @@ services:
       "dbote__Worker__ServiceBus__Queues__Cloud": "bote-sample-loadtest-cloud"
       "dbote__Worker__ServiceBus__Queues__CloudIncoming": "bote-sample-loadtest-cloud-incoming"
       "dbote__Worker__ServiceBus__Queues__Clients": "bote-sample-loadtest-clients"
-      "dbote__Worker__ServiceBus__Queues__Error": "bote-sample-loadtest-error"
-      "dbote__Worker__ServiceBus__Queues__Events": "bote-sample-loadtest-events"
       "dbote__Worker__SignalR__Connection": "Endpoint=http://signalr;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;"
       "dbote__Worker__OpenId__Authority": "http://basicidentityprovider"
       "dbote__Worker__OpenId__JwksUri": "http://basicidentityprovider/api/.well-known/jwks.json"

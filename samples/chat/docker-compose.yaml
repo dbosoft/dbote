@@ -40,7 +40,6 @@ services:
       "dbote__Cloud__ServiceBus__Queues__CloudIncoming": "bote-sample-chat-cloud-incoming"
       "dbote__Cloud__ServiceBus__Queues__Clients": "bote-sample-chat-clients"
       "dbote__Cloud__ServiceBus__Queues__Error": "bote-sample-chat-error"
-      "dbote__Cloud__ServiceBus__Queues__Events": "bote-sample-chat-events"
       "dbote__Cloud__Storage__Connection": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
 
   dbote-worker:
@@ -72,8 +71,6 @@ services:
       "dbote__Worker__ServiceBus__Queues__Cloud": "bote-sample-chat-cloud"
       "dbote__Worker__ServiceBus__Queues__CloudIncoming": "bote-sample-chat-cloud-incoming"
       "dbote__Worker__ServiceBus__Queues__Clients": "bote-sample-chat-clients"
-      "dbote__Worker__ServiceBus__Queues__Error": "bote-sample-chat-error"
-      "dbote__Worker__ServiceBus__Queues__Events": "bote-sample-chat-events"
       "dbote__Worker__SignalR__Connection": "Endpoint=http://signalr;Port=8888;AccessKey=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGH;Version=1.0;"
       "dbote__Worker__OpenId__Authority": "http://basicidentityprovider"
       "dbote__Worker__OpenId__JwksUri": "http://basicidentityprovider/api/.well-known/jwks.json"

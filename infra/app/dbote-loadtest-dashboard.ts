@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { Environnment } from "../environment";
+import { Environnment } from "../core";
 import { ServicePlan } from "@cdktf/provider-azurerm/lib/service-plan";
 import { LinuxWebApp } from "@cdktf/provider-azurerm/lib/linux-web-app";
 

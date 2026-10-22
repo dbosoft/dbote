@@ -2,10 +2,10 @@
 // Copyright (c) 2012-2016 Mogens Heller Grabe
 // Licensed under MIT license https://github.com/rebus-org/Rebus.AzureServiceBus/blob/master/LICENSE.md
 
+using System.Globalization;
 using Azure.Messaging.ServiceBus;
 using Dbosoft.Bote.Primitives;
 using Dbosoft.Bote.Transport.Abstractions;
-using Rebus.Extensions;
 using Rebus.Messages;
 
 namespace Dbosoft.Bote.BoteWorker.Converters;
@@ -43,14 +43,17 @@ internal class MessageConverter : IMessageConverter
 
         if (headers.TryGetValue(Headers.TimeToBeReceived, out var timeToBeReceivedStr))
         {
-            var timeToBeReceived = TimeSpan.Parse(timeToBeReceivedStr!);
+            var timeToBeReceived = TimeSpan.Parse(timeToBeReceivedStr!, CultureInfo.InvariantCulture);
             message.TimeToLive = timeToBeReceived;
             headers.Remove(Headers.TimeToBeReceived);
         }
 
         if (headers.TryGetValue(Headers.DeferredUntil, out var deferUntilTime))
         {
-            var deferUntilDateTimeOffset = deferUntilTime.ToDateTimeOffset();
+            // Parsed leniently: Rebus versions differ in how many fractional digits they write
+            // (8.9 writes 6, the exact parser of 8.8 wants 7), and clients may run either.
+            var deferUntilDateTimeOffset = DateTimeOffset.Parse(deferUntilTime!,
+                CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
             message.ScheduledEnqueueTime = deferUntilDateTimeOffset;
             headers.Remove(Headers.DeferredUntil);
         }

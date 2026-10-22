@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0-noble AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0-noble AS build
 ARG TARGETARCH
 WORKDIR /source
 
@@ -7,7 +7,7 @@ COPY . .
 RUN dotnet publish -a $TARGETARCH -o /app ./ClientSetupTool/ClientSetupTool.csproj
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/runtime:8.0-noble
+FROM mcr.microsoft.com/dotnet/runtime:10.0-noble
 WORKDIR /app
 COPY --link --from=build /app .
 USER $APP_UID

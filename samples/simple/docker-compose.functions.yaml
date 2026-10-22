@@ -1,0 +1,10 @@
+# Runs the cloud side as Azure Functions with Dbosoft.Bote.Cloud (no Rebus) instead of the
+# Rebus cloud service. The clients stay the same. Use together with the other compose files:
+#   docker compose -f docker-compose.yaml -f docker-compose.override.yaml -f docker-compose.functions.yaml up
+services:
+  cloud:
+    build:
+      context: ./Dbosoft.Bote.Samples.Simple.Functions
+    environment:
+      "AzureWebJobsStorage": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;"
+      "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"

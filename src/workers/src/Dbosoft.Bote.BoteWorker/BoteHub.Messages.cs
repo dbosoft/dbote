@@ -40,19 +40,11 @@ internal partial class BoteHub
         var clientId = ExtractClientId(invocationContext);
 
 
-        // Validate queue name against whitelist
-        var actualQueueName = queue.StartsWith($"{serviceBusOptions.Value.Queues.Clients}-")
-            ? $"{serviceBusOptions.Value.Queues.Clients}"
-            : queue;
+        // Clients send to the cloud queue, or to their own queue to defer a message.
+        var target = BoteQueuePolicy.ResolveClientSendTarget(queue,
+            serviceBusOptions.Value.Queues.Cloud, serviceBusOptions.Value.Queues.Clients, clientId);
 
-        // clients can only send to Cloud queue or clients queue
-        var allowedQueues = new[]
-        {
-            serviceBusOptions.Value.Queues.Cloud,
-            serviceBusOptions.Value.Queues.Clients
-        };
-
-        if (!allowedQueues.Contains(actualQueueName))
+        if (target is null)
         {
             logger.LogWarning("Client {TenantId}-{ClientId} attempted to send to unauthorized queue: {Queue}",
                 tenantId, clientId, queue);
@@ -80,13 +72,20 @@ internal partial class BoteHub
         serviceBusMessage.ApplicationProperties.Add(BoteHeaders.ClientId, clientId);
 
 
-        var targetQueueName = serviceBusOptions.Value.Queues.Cloud;
+        // A message to itself goes through the clients queue, which delivers it back to the
+        // client at its scheduled time; the identity set above routes it to the sender only.
+        var targetQueueName = target == ClientSendTarget.Self
+            ? serviceBusOptions.Value.Queues.Clients
+            : serviceBusOptions.Value.Queues.Cloud;
         Uri? sasUri = null;
 
         // Check if this is an attachment message that needs monitoring
         if (serviceBusMessage.ApplicationProperties.TryGetValue(BoteHeaders.AttachmentId,
                 out var attachmentIdOb))
         {
+            if (target == ClientSendTarget.Self)
+                throw new NotSupportedException("A client cannot send an attachment to itself.");
+
             var attachmentId = attachmentIdOb.ToString()
                                ?? throw new InvalidOperationException(
                                    $"Invalid {BoteHeaders.AttachmentId} header value.");
@@ -182,8 +181,12 @@ internal partial class BoteHub
         var tb = Stopwatch.GetTimestamp();
         var boteMsg = messageConverter.ToBote(message);
         workerMetrics.OutToBote.Record(WorkerMetrics.MsSince(tb));
-        boteMsg.Headers.Remove(BoteHeaders.AttachmentId);
-        boteMsg.Headers.Remove(BoteHeaders.ReScheduleCounter);
+        // The dbote-* headers are the worker's: a client may not send them, so it must not get
+        // them either - or a handler that defers a broadcast (Rebus copies the headers) is
+        // refused for setting dbote-topic.
+        foreach (var key in boteMsg.Headers.Keys
+                     .Where(k => k.StartsWith("dbote-", StringComparison.OrdinalIgnoreCase)).ToList())
+            boteMsg.Headers.Remove(key);
 
         logger.LogInformation("Ready to forward message {MessageId} to tenant {TenantId}", 
             message.MessageId, tenantId);

@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0-noble AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0-noble AS build
 ARG TARGETARCH
 WORKDIR /source
 
@@ -8,7 +8,7 @@ RUN dotnet restore -a $TARGETARCH ServiceBusApiEmulator/ServiceBusApiEmulator.cs
 RUN dotnet publish -a $TARGETARCH --no-restore -o /app ServiceBusApiEmulator/ServiceBusApiEmulator.csproj
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-noble
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble
 ENV ASPNETCORE_HTTP_PORTS=80
 EXPOSE 80
 WORKDIR /app

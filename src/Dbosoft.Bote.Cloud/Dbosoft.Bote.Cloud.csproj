@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Cloud side of dbosoft bote without Rebus: receive client messages from the cloud queue and send to clients, e.g. from Azure Functions.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.21.0" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.23.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dbosoft.Bote.Primitives\Dbosoft.Bote.Primitives.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dbosoft.Bote.Rebus.IntegrationTests" />
+  </ItemGroup>
+
+</Project>

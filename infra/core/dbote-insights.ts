@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { Environnment } from "../environment";
+import { Environnment } from "./environment";
 import { LogAnalyticsWorkspace } from "@cdktf/provider-azurerm/lib/log-analytics-workspace";
 import { ApplicationInsights } from "@cdktf/provider-azurerm/lib/application-insights";
 import { monitorSmartDetectorAlertRule } from "@cdktf/provider-azurerm";

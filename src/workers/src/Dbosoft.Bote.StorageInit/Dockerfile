@@ -1,7 +1,7 @@
-FROM mcr.microsoft.com/dotnet/runtime:8.0-noble AS base
+FROM mcr.microsoft.com/dotnet/runtime:10.0-noble AS base
 WORKDIR /app
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0-noble AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS build
 WORKDIR /source
 COPY . .
 RUN dotnet publish -a amd64 -o /app ./Dbosoft.Bote.StorageInit.csproj

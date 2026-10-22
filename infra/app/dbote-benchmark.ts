@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { Environnment } from "../environment";
+import { Environnment } from "../core";
 import { RoleAssignment } from "@cdktf/provider-azurerm/lib/role-assignment";
 import { DataAzurermContainerRegistry } from "@cdktf/provider-azurerm/lib/data-azurerm-container-registry";
 import { ContainerApp } from "@cdktf/provider-azurerm/lib/container-app";

@@ -1,38 +1,20 @@
 import { Construct } from "constructs";
-import { App, AzurermBackend, TerraformStack, Token } from "cdktf";
+import { App, AzurermBackend, TerraformStack } from "cdktf";
 import { AzurermProvider } from "@cdktf/provider-azurerm/lib/provider";
-import { StorageAccount } from "@cdktf/provider-azurerm/lib/storage-account";
-import { ServicebusNamespace } from "@cdktf/provider-azurerm/lib/servicebus-namespace";
-import { SignalrService, SignalrServiceUpstreamEndpointList } from "@cdktf/provider-azurerm/lib/signalr-service";
-import { RoleAssignment } from "@cdktf/provider-azurerm/lib/role-assignment";
-import { ServicebusQueue } from "@cdktf/provider-azurerm/lib/servicebus-queue";
 import { AppConfiguration } from "@cdktf/provider-azurerm/lib/app-configuration";
-import { AppConfigurationKey } from "@cdktf/provider-azurerm/lib/app-configuration-key";
-import { DboteInsights } from "./constructs/dbote-insights";
-import { Environnment } from "./environment";
-import { DboteWorker } from "./constructs/dbote-worker";
-import { StorageTable } from "@cdktf/provider-azurerm/lib/storage-table";
-import { StorageManagementPolicy } from "@cdktf/provider-azurerm/lib/storage-management-policy";
-// Benchmark load generator is skipped for the initial worker-only deploy (it needs the
-// pre-existing acrbotetest container registry, which lives in the old subscription).
-// import { DboteBenchmark } from "./constructs/dbote-benchmark";
-import { DboteIdentityProvider } from "./constructs/dbote-identity-provider";
-import { DboteLoadTestDashboard } from "./constructs/dbote-loadtest-dashboard";
-import { DboteLoadTestController } from "./constructs/dbote-loadtest-controller";
+import { DataAzurermContainerRegistry } from "@cdktf/provider-azurerm/lib/data-azurerm-container-registry";
+import { AzapiProvider, DboteGateway, DboteInsights, Environnment } from "./core";
+import { DboteIdentityProvider } from "./app/dbote-identity-provider";
+import { DboteSampleApp } from "./app/dbote-sample-app";
+
+// The reference deployment of this repository: the shared platform, the gateway from
+// @dbosoft/bote-infra (./core) and the samples as the application on top of it. An application
+// of its own builds the same stack with its own application layer instead of DboteSampleApp.
 
 const location = "westeurope"; // Define the location for resources
 const resourceGroupName = "rg-dbote-test"; // Define the resource group name
 const tenantId = 'cb0bb315-f38b-4ab4-ad2d-d3ed25d23b53';
 const subscriptionId = '998590b9-1c43-452a-9b02-dcf9ed5acb64';
-
-function formatName(type: string, name: string, env: string, sanitize: boolean = false): string {
-  const formattedName = `${type}-${name}-${env}`;
-  return sanitize ? sanitizeName(formattedName) : formattedName;
-}
-
-function sanitizeName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
 
 
 class DboteStack extends TerraformStack {
@@ -50,7 +32,12 @@ class DboteStack extends TerraformStack {
       ],
     });
 
+    new AzapiProvider(this, "azapi");
+
     const environment = new Environnment(tenantId, location, resourceGroupName, 'cmdev');
+
+    // ---- Platform: central, provided once per platform and handed to the gateway as inputs.
+    // Created here only because this reference deployment has no platform of its own.
 
     const insights = new DboteInsights(this, environment);
 
@@ -61,398 +48,43 @@ class DboteStack extends TerraformStack {
       sku: 'developer',
     });
 
-    // Deploy BasicIdentityProvider. Its client registry is shared across instances via Table Storage
-    // (configured in the construct) so a client that registers on one instance can obtain a token
+    // The registry already exists; the worker image is pushed there by Prepare-Artifacts.ps1.
+    const registry = new DataAzurermContainerRegistry(this, 'acrdbotecmdev', {
+      name: 'acrdbotecmdev',
+      resourceGroupName,
+    });
+
+    // ---- Application: identity provider. BasicIdentityProvider is dev-only; a real application
+    // brings its own and passes its issuer to the gateway. Its client registry is shared across
+    // instances via Table Storage so a client that registers on one instance can obtain a token
     // from another (Flex Consumption).
     const identityProvider = new DboteIdentityProvider(this, environment, insights.connection);
-
-    const worker = new DboteWorker(this, environment, appConfiguration.endpoint, insights.connection);
 
     // Audience is just a logical identifier that must match between issuer and validator
     const audience = 'http://dbote-worker/api';
 
     identityProvider.addAppSetting('BasicIdentityProvider__Audience', audience);
 
-    // const benchmark = new DboteBenchmark(this, environment, appConfiguration.endpoint, insights.connection);
-
-    // Service Bus
-    const serviceBusNamespaceName = formatName('sbns', 'dbote', 'cmdev', false);
-    const serviceBusNamespace = new ServicebusNamespace(this, serviceBusNamespaceName, {
-      location,
-      resourceGroupName,
-      name: serviceBusNamespaceName,
-      // Standard, not Basic: the worker reschedules not-ready attachments with
-      // ScheduleMessageAsync (scheduled/deferred messages), which the Basic SKU does not support.
-      sku: 'Standard',
-    });
-    
-    // This is not optimal but there is no way to extract the hostname from
-    // serviceBusNamespace.endpoint at the moment (as it is a CDKTF token
-    // and there is no support for URL parsing at the moment).
-    const fullyQualifiedNamespace = `${serviceBusNamespace.name}.servicebus.windows.net`
-
-    const cloudQueue = new ServicebusQueue(this, environment.formatName('sbq', 'cloud'), {
-      namespaceId: serviceBusNamespace.id,
-      name: environment.formatName('sbq', 'cloud'),
-    });
-
-    // The worker's CloudIncomingMonitor trigger reads from this queue (attachment reschedule
-    // path). It was missing from infra, so the deployed trigger had no queue to bind to.
-    const cloudIncomingQueue = new ServicebusQueue(this, environment.formatName('sbq', 'cloud-incoming'), {
-      namespaceId: serviceBusNamespace.id,
-      name: environment.formatName('sbq', 'cloud-incoming'),
-    });
-
-    const clientsQueue = new ServicebusQueue(this, environment.formatName('sbq', 'clients'), {
-      namespaceId: serviceBusNamespace.id,
-      name: environment.formatName('sbq', 'clients'),
-    });
-
-    const errorQueue = new ServicebusQueue(this, environment.formatName('sbq', 'error'), {
-      namespaceId: serviceBusNamespace.id,
-      name: environment.formatName('sbq', 'error'),
-    });
-
-    const runnerQueue = new ServicebusQueue(this, environment.formatName('sbq', 'runner'), {
-      namespaceId: serviceBusNamespace.id,
-      name: environment.formatName('sbq', 'runner'),
-    });
-
-    const serviceQueue = new ServicebusQueue(this, environment.formatName('sbq', 'service'), {
-      namespaceId: serviceBusNamespace.id,
-      name: environment.formatName('sbq', 'service'),
-    });
-
-    const eventsQueue = new ServicebusQueue(this, environment.formatName('sbq', 'events'), {
-      namespaceId: serviceBusNamespace.id,
-      name: environment.formatName('sbq', 'events'),
-    });
-
-    // SignalR
-    const signalrServiceName = environment.formatName('signalr', 'dbote');
-    const signalrService = new SignalrService(this, signalrServiceName, {
-      name: signalrServiceName,
-      location,
-      resourceGroupName,
-      sku: {
-        name: 'Standard_S1',
-        capacity: 1,
-      },
-      identity:{
-        type: 'SystemAssigned',
-      },
-      serviceMode: 'Serverless',
-      upstreamEndpoint: [
-        {
-          urlTemplate: worker.signalREndpoint,
-          eventPattern: ['*'],
-          hubPattern: ['*'],
-          categoryPattern: ['*']
-        }
-      ]
-    });
-
-    new RoleAssignment(this, environment.formatName('role', 'signalr-func-kv'), {
-      scope: worker.keyVaultId,
-      roleDefinitionName: 'Key Vault Secrets User',
-      principalId: signalrService.identity.principalId,
-    })
-
-    // Storage
-    const storageAccount = new StorageAccount(this, environment.formatSafeName('st'), {
-      name: environment.formatSafeName('st'),
-      location: environment.location,
-      resourceGroupName: environment.resourceGroup,
-      accountTier: "Standard",
-      accountReplicationType: "LRS",
-    });
-
-    // Create subscriptions table for BoteWorker topic subscriptions
-    new StorageTable(this, environment.formatName('stt', 'subscriptions'), {
-      storageAccountName: storageAccount.name,
-      name: 'subscriptions',
-    });
-
-    // DataBus attachment lifecycle (H4c). Attachments are staged as blobs and copied
-    // between the outbox/inbox/client-datastore containers. Success paths delete their
-    // source blob eagerly, but the remaining orphan classes cannot be deleted inline:
-    //   - failed/partial copies (a retried message must still find its attachment), and
-    //   - cloud->client broadcast blobs stored per-tenant at {tenantId}/{attachmentId}
-    //     and shared by every subscriber, so no single client may delete them.
-    // A bounded TTL is the retry-safe backstop that reaps every orphan. Only blob
-    // containers live in this account (queues + the subscriptions table are unaffected).
-    new StorageManagementPolicy(this, environment.formatName('stmp', 'databus-ttl'), {
-      storageAccountId: storageAccount.id,
-      rule: [{
-        name: 'databus-attachment-ttl',
-        enabled: true,
-        filters: {
-          blobTypes: ['blockBlob'],
-        },
-        actions: {
-          baseBlob: {
-            deleteAfterDaysSinceModificationGreaterThan: 7,
-          },
-        },
-      }],
-    });
-
-    // Load-test cloud side: a single consolidator/dashboard web app, and the horizontally scalable
-    // controller as a Container App that scales on the cloud queue's backlog (KEDA).
-    const ltDashboard = new DboteLoadTestDashboard(this, environment, {
-      serviceBusConnectionString: serviceBusNamespace.defaultPrimaryConnectionString,
-      storageConnectionString: storageAccount.primaryConnectionString,
-      cloudQueue: cloudQueue.name,
-      clientsQueue: clientsQueue.name,
+    // ---- Gateway
+    const gateway = new DboteGateway(this, environment, {
+      subscriptionId,
+      registry: { id: registry.id, loginServer: registry.loginServer },
+      appConfigurationId: appConfiguration.id,
+      appConfigurationEndpoint: appConfiguration.endpoint,
       appInsightsConnection: insights.connection,
+      openId: {
+        authority: identityProvider.endpoint,
+        jwksUri: `${identityProvider.endpoint}/.well-known/jwks.json`,
+        audience,
+        requiredScope: 'bote',
+      },
     });
 
-    new DboteLoadTestController(this, environment, {
-      serviceBusConnectionString: serviceBusNamespace.defaultPrimaryConnectionString,
-      serviceBusNamespaceName: serviceBusNamespace.name,
-      storageConnectionString: storageAccount.primaryConnectionString,
-      cloudQueue: cloudQueue.name,
-      clientsQueue: clientsQueue.name,
-      errorQueue: errorQueue.name,
+    // ---- Application: the samples' queues and settings.
+    new DboteSampleApp(this, environment, {
+      gateway,
+      appConfigurationId: appConfiguration.id,
       appInsightsConnection: insights.connection,
-      consolidatorUrl: ltDashboard.url,
-    });
-
-    // role assignments - worker
-    new RoleAssignment(this, environment.formatName('role', 'func-sbns'), {
-      scope: serviceBusNamespace.id,
-      roleDefinitionName: 'Azure Service Bus Data Owner',
-      principalId: worker.functionPrincipalId,
-    });
-
-    new RoleAssignment(this, environment.formatName('role', 'func-appcs'), {
-      scope: appConfiguration.id,
-      roleDefinitionName: 'App Configuration Data Reader',
-      principalId: worker.functionPrincipalId,
-    });
-
-    new RoleAssignment(this, environment.formatName('role', 'func-signalr'), {
-      scope: signalrService.id,
-      roleDefinitionName: 'SignalR Service Owner',
-      principalId: worker.functionPrincipalId,
-    });
-
-    new RoleAssignment(this, environment.formatName('role', 'func-stq'), {
-      scope: storageAccount.id,
-      roleDefinitionName: 'Storage Queue Data Contributor',
-      principalId: worker.functionPrincipalId,
-    });
-
-    new RoleAssignment(this, environment.formatName('role', 'func-stt'), {
-      scope: storageAccount.id,
-      roleDefinitionName: 'Storage Table Data Contributor',
-      principalId: worker.functionPrincipalId,
-    });
-
-    // Note: The above role assignment covers access to all tables in the storage account,
-    // including the subscriptions table created above
-
-    // app config - worker
-
-    // The SignalR and Azure Service Bus configuration cannot be placed
-    // in the App Configuration Service as the Azure Function host parses
-    // them to setup the triggers.
-    // TODO use managed identity for table and queue storage
-    worker.addAppSetting('dbote__Worker__Storage__Connection', storageAccount.primaryConnectionString);
-    worker.addAppSetting('dbote__Worker__ServiceBus__Connection__fullyQualifiedNamespace', fullyQualifiedNamespace);
-    worker.addAppSetting('dbote__Worker__ServiceBus__Connection__credential', 'managedidentity');
-    worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Cloud', cloudQueue.name);
-    worker.addAppSetting('dbote__Worker__ServiceBus__Queues__CloudIncoming', cloudIncomingQueue.name);
-    worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Clients', clientsQueue.name);
-    worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Error', errorQueue.name);
-    worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Events', eventsQueue.name);
-    worker.addAppSetting('dbote__Worker__SignalR__Connection__serviceUri', `https://${signalrServiceName}.service.signalr.net`);
-    worker.addAppSetting('dbote__Worker__SignalR__Connection__credential', 'managedidentity');
-    worker.addAppSetting('dbote__Worker__OpenId__Authority', identityProvider.endpoint);
-    worker.addAppSetting('dbote__Worker__OpenId__JwksUri', `${identityProvider.endpoint}/.well-known/jwks.json`);
-    worker.addAppSetting('dbote__Worker__OpenId__Audience', audience);
-    worker.addAppSetting('dbote__Worker__OpenId__RequiredScope', 'bote');
-
-/*
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-storage-connection'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Worker:Storage:Connection',
-      value: storageAccount.primaryConnectionString,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-namespace'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Worker:ServiceBus:Connection:fullyQualifiedNamespace',
-      value: fullyQualifiedNamespace,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-credentialtype'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Worker:ServiceBus:Connection:credential',
-      value: 'managedidentity',
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-queue-cloud'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Worker:ServiceBus:Queues:Cloud',
-      value: cloudQueue.name,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-queue-clients'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Worker:ServiceBus:Queues:Clients',
-      value: clientsQueue.name,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-servicebus-queue-error'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Worker:ServiceBus:Queues:Error',
-      value: errorQueue.name,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-signalr-serviceuri'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Worker:SignalR:Connection:serviceUri',
-      value: `https://${signalrService.hostname}`,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-signalr-credentialtype'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Worker:SignalR:Connection:credential',
-      value: 'managedidentity',
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'func-openid-authority'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Worker:OpenId:Authority',
-      value: worker.dboteEndpoint,
-      label: environment.environment,
-    });
-*/
-
-    // role assignments - benchmark cloud (skipped with the benchmark)
-    /*
-    new RoleAssignment(this, environment.formatName('role', 'app-cloud-sbns'), {
-      scope: serviceBusNamespace.id,
-      roleDefinitionName: 'Azure Service Bus Data Owner',
-      principalId: benchmark.cloudPrincipalId,
-    });
-
-    new RoleAssignment(this, environment.formatName('role', 'app-cloud-appcs'), {
-      scope: appConfiguration.id,
-      roleDefinitionName: 'App Configuration Data Reader',
-      principalId: benchmark.cloudPrincipalId,
-    });
-    */
-
-
-    // app config - benchmark cloud
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-namespace'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Cloud:ServiceBus:Connection:fullyQualifiedNamespace',
-      value: fullyQualifiedNamespace,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-credentialtype'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Cloud:ServiceBus:Connection:credential',
-      value: 'managedidentity',
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-cloud'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Cloud:ServiceBus:Queues:Cloud',
-      value: cloudQueue.name,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-clients'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Cloud:ServiceBus:Queues:Clients',
-      value: clientsQueue.name,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-error'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Cloud:ServiceBus:Queues:Error',
-      value: errorQueue.name,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-service'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Cloud:ServiceBus:Queues:Service',
-      value: serviceQueue.name,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-cloud-servicebus-queue-events'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Cloud:ServiceBus:Queues:Events',
-      value: eventsQueue.name,
-      label: environment.environment,
-    });
-
-    // role assignments - benchmark service (skipped with the benchmark)
-    /*
-    new RoleAssignment(this, environment.formatName('role', 'app-service-sbns'), {
-      scope: serviceBusNamespace.id,
-      roleDefinitionName: 'Azure Service Bus Data Owner',
-      principalId: benchmark.servicePrincipalId,
-    });
-
-    new RoleAssignment(this, environment.formatName('role', 'app-service-appcs'), {
-      scope: appConfiguration.id,
-      roleDefinitionName: 'App Configuration Data Reader',
-      principalId: benchmark.servicePrincipalId,
-    });
-    */
-
-    // app config - benchmark service
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-namespace'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Service:ServiceBus:Connection:fullyQualifiedNamespace',
-      value: fullyQualifiedNamespace,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-credentialtype'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Service:ServiceBus:Connection:credential',
-      value: 'managedidentity',
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-queue-cloud'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Service:ServiceBus:Queues:Cloud',
-      value: cloudQueue.name,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-queue-error'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Service:ServiceBus:Queues:Error',
-      value: errorQueue.name,
-      label: environment.environment,
-    });
-
-    new AppConfigurationKey(this, environment.formatName('appcsk', 'app-service-servicebus-queue-service'), {
-      configurationStoreId: appConfiguration.id,
-      key: 'dbote:Service:ServiceBus:Queues:Service',
-      value: serviceQueue.name,
-      label: environment.environment,
     });
   }
 }

@@ -40,6 +40,20 @@ configs:
                   }
                 },
                 {
+                  "Name": "bote-benchmark-cloud-incoming",
+                  "Properties": {
+                    "DeadLetteringOnMessageExpiration": false,
+                    "DefaultMessageTimeToLive": "PT1H",
+                    "DuplicateDetectionHistoryTimeWindow": "PT20S",
+                    "ForwardDeadLetteredMessagesTo": "",
+                    "ForwardTo": "",
+                    "LockDuration": "PT1M",
+                    "MaxDeliveryCount": 3,
+                    "RequiresDuplicateDetection": false,
+                    "RequiresSession": false
+                  }
+                },
+                {
                   "Name": "bote-benchmark-error",
                   "Properties": {
                     "DeadLetteringOnMessageExpiration": false,

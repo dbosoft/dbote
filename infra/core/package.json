@@ -1,0 +1,24 @@
+{
+  "name": "@dbosoft/bote-infra",
+  "version": "0.1.0",
+  "description": "CDKTF constructs for a dbosoft bote gateway: worker on Functions-on-Container-Apps, Service Bus, SignalR, storage.",
+  "license": "MIT",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "*.js",
+    "*.d.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "@cdktf/provider-azurerm": "^14.23.1",
+    "cdktf": "^0.21.0",
+    "constructs": "^10.4.2"
+  },
+  "engines": {
+    "node": ">=18.0"
+  }
+}

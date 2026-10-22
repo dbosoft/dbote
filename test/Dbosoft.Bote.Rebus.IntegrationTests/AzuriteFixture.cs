@@ -1,4 +1,4 @@
-using Testcontainers.Azurite;
+﻿using Testcontainers.Azurite;
 
 namespace Dbosoft.Bote.Rebus.IntegrationTests;
 
@@ -17,8 +17,7 @@ public sealed class AzuriteFixture : IAsyncLifetime
     // Azure.Storage.Queues SDK we depend on.
     private const string AzuriteImage = "mcr.microsoft.com/azure-storage/azurite:3.35.0";
 
-    private readonly AzuriteContainer _container = new AzuriteBuilder()
-        .WithImage(AzuriteImage)
+    private readonly AzuriteContainer _container = new AzuriteBuilder(AzuriteImage)
         .Build();
 
     public string ConnectionString => _container.GetConnectionString();

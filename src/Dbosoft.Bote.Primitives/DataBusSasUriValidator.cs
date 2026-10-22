@@ -1,4 +1,4 @@
-namespace Dbosoft.Bote.Rebus.Integration.Pipeline;
+namespace Dbosoft.Bote.Primitives;
 
 /// <summary>
 /// Defense-in-depth against SSRF: the cloud downloads a DataBus attachment from a SAS URL
@@ -7,7 +7,7 @@ namespace Dbosoft.Bote.Rebus.Integration.Pipeline;
 /// other than its own storage account - otherwise a single bad/forged header would make the
 /// cloud issue an authenticated request to an attacker-chosen host.
 /// </summary>
-internal static class DataBusSasUriValidator
+public static class DataBusSasUriValidator
 {
     /// <summary>
     /// Whether <paramref name="sasUri"/> targets the same storage endpoint as

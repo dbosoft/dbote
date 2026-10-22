@@ -14,7 +14,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       # The repo's nuget.config lists private dbosoft Azure DevOps feeds that require auth and
       # return 401 on CI. No project actually references a private package (all are on

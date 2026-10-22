@@ -1,4 +1,4 @@
-using Azure.Storage.Blobs;
+﻿using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
 using Dbosoft.Bote.BoteWorker.Extensions;
 using Dbosoft.Bote.BoteWorker.Services;
@@ -40,7 +40,9 @@ internal class DataBusCopyFile(
     /// </summary>
     [Function("CloudOutboxBlobDetected")]
     public async Task CloudOutboxBlobDetected(
-        [BlobTrigger("bote-outbox/{tenantId}/{attachmentId}")] BlobClient sourceBlob,
+        // The outbox lives in the gateway storage next to the inbox, not in the Functions host
+        // storage (AzureWebJobsStorage), so the cloud only needs access to one account.
+        [BlobTrigger("bote-outbox/{tenantId}/{attachmentId}", Connection = "dbote:Worker:Storage:Connection")] BlobClient sourceBlob,
         string tenantId,
         string attachmentId)
     {

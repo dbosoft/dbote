@@ -1,7 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -11,10 +11,10 @@
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" Version="9.0.0" />
     <PackageReference Include="Azure.Storage.Queues" Version="12.22.0" />
-    <PackageReference Include="Microsoft.Extensions.Azure" Version="1.12.0" />
+    <PackageReference Include="Microsoft.Extensions.Azure" Version="1.14.1" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="Rebus" Version="8.8.0" />
-    <PackageReference Include="Testcontainers.Azurite" Version="4.0.0" />
+    <PackageReference Include="Rebus" Version="8.9.5" />
+    <PackageReference Include="Testcontainers.Azurite" Version="4.16.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.1">
       <PrivateAssets>all</PrivateAssets>
@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\client\src\Dbosoft.Bote.Rebus\Dbosoft.Bote.Rebus.csproj" />
+    <ProjectReference Include="..\..\src\Dbosoft.Bote.Cloud\Dbosoft.Bote.Cloud.csproj" />
     <ProjectReference Include="..\..\src\Dbosoft.Bote.Rebus.Integration\Dbosoft.Bote.Rebus.Integration.csproj" />
     <ProjectReference Include="..\..\src\workers\src\Dbosoft.Bote.BoteWorker\Dbosoft.Bote.BoteWorker.csproj" />
   </ItemGroup>

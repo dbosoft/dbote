@@ -185,6 +185,14 @@ builder.Services.AddRebus((configure, serviceProvider) =>
 - Use Service Bus connection (standard Rebus ASB transport)
 - Route messages to `{clientsQueue}-{clientId}` (formatter redirects to shared queue)
 
+### Cloud Side without Rebus (e.g. Azure Functions)
+
+The cloud side can also be a backend that is not a Rebus endpoint, e.g. an Azure Functions app.
+It uses `Dbosoft.Bote.Cloud` (`src/Dbosoft.Bote.Cloud`): `BoteIncomingMessage.From(message)` in a
+`[ServiceBusTrigger]` on the cloud queue, `BoteCloudSender` to send/broadcast/reply to clients. The
+clients stay Rebus clients; the wire contract is in `docs/cloud-without-rebus.md` and guarded by
+`CloudRoundTripTests`. Sample: `samples/simple/Start-Services.ps1 -Functions`.
+
 ### Sending Messages to Clients
 
 #### Targeted Message (to specific client):
@@ -369,6 +377,17 @@ For production deployments, replace with a proper identity/auth service:
 - Adding new routing patterns
 - Adding new header-based features
 - Changing queue naming conventions
+
+#### 1b. Cloud Side without Rebus (`src/Dbosoft.Bote.Cloud`)
+
+**Purpose**: Same job as the Rebus integration for backends without Rebus (Azure Functions)
+
+**Key Files**:
+- `BoteIncomingMessage.cs`: Reads a client message from the cloud queue (tenant, client, type, body, inbox attachment with SSRF guard)
+- `BoteCloudSender.cs`: Sends to a client / broadcasts to a topic / replies; stages outbox attachments first
+- `RebusWireFormat.cs`: The Rebus header names, content type and type naming the clients expect
+
+**When to Update**: Whenever the Rebus integration or the worker changes how messages look on Service Bus - `CloudRoundTripTests` fails if the two drift apart.
 
 #### 2. Custom Transport (`src/client/src/Dbosoft.Bote.Rebus`)
 

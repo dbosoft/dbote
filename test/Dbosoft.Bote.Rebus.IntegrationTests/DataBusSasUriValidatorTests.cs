@@ -1,5 +1,5 @@
 using AwesomeAssertions;
-using Dbosoft.Bote.Rebus.Integration.Pipeline;
+using Dbosoft.Bote.Primitives;
 
 namespace Dbosoft.Bote.Rebus.IntegrationTests;
 
