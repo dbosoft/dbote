@@ -1,0 +1,13 @@
+<Project>
+  <!-- Package metadata of the bote libraries; the applications under src set IsPackable=false. -->
+  <PropertyGroup>
+    <Authors>dbosoft</Authors>
+    <Company>dbosoft GmbH</Company>
+    <Copyright>Copyright (c) dbosoft</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/dbosoft/dbote</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/dbosoft/dbote</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>dbosoft;bote;rebus;azure;servicebus;signalr;hybrid;multi-tenant</PackageTags>
+  </PropertyGroup>
+</Project>
