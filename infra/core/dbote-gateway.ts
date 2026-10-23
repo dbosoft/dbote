@@ -262,11 +262,13 @@ export class DboteGateway extends Construct {
         worker.addAppSetting('dbote__Worker__Storage__Connection', storageAccount.primaryConnectionString);
         worker.addAppSetting('dbote__Worker__ServiceBus__Connection__fullyQualifiedNamespace', this.fullyQualifiedNamespace);
         worker.addAppSetting('dbote__Worker__ServiceBus__Connection__credential', 'managedidentity');
+        worker.addAppSetting('dbote__Worker__ServiceBus__Connection__clientId', worker.identityClientId);
         worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Cloud', cloudQueue.name);
         worker.addAppSetting('dbote__Worker__ServiceBus__Queues__CloudIncoming', cloudIncomingQueue.name);
         worker.addAppSetting('dbote__Worker__ServiceBus__Queues__Clients', clientsQueue.name);
         worker.addAppSetting('dbote__Worker__SignalR__Connection__serviceUri', `https://${signalrServiceName}.service.signalr.net`);
         worker.addAppSetting('dbote__Worker__SignalR__Connection__credential', 'managedidentity');
+        worker.addAppSetting('dbote__Worker__SignalR__Connection__clientId', worker.identityClientId);
         worker.addAppSetting('dbote__Worker__OpenId__Authority', props.openId.authority);
         worker.addAppSetting('dbote__Worker__OpenId__JwksUri', props.openId.jwksUri);
         worker.addAppSetting('dbote__Worker__OpenId__Audience', props.openId.audience);

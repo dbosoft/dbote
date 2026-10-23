@@ -10,7 +10,7 @@ import { Fn, Token } from "cdktf";
 import { AzapiResource } from "./azapi";
 
 export interface DboteContainerRegistry {
-    /** Resource id of the registry; the worker's pull identity is granted AcrPull on it. */
+    /** Resource id of the registry; the worker's identity is granted AcrPull on it. */
     readonly id: string;
     /** e.g. `myregistry.azurecr.io` */
     readonly loginServer: string;
@@ -44,7 +44,15 @@ export interface DboteWorkerProps {
 export class DboteWorker extends Construct {
 
     public readonly signalREndpoint: string;
+    /**
+     * The worker's user-assigned identity: it pulls the image and is the identity the worker runs
+     * as. Known when the plan is made and unchanged by updates of the app, unlike a
+     * system-assigned identity read back from the app, whose id would be unknown on every change
+     * and have Terraform replace each role assignment that names it.
+     */
     public readonly functionPrincipalId: string;
+    /** Client id of that identity, for the settings of identity-based connections. */
+    public readonly identityClientId: string;
     public readonly dboteEndpoint: string;
     public readonly keyVaultId: string;
     /** The Functions host storage (AzureWebJobsStorage): host state, keys, databus-copy-monitor. */
@@ -91,7 +99,6 @@ export class DboteWorker extends Construct {
             storageAccountName: functionStorageAccount.name,
         });
 
-        // Container Apps environment + ACR pull identity (same pattern as the load-test controller).
         const acr = props.registry;
 
         const appEnvironment = new ContainerAppEnvironment(this, environment.formatName('cae', 'worker'), {
@@ -101,7 +108,7 @@ export class DboteWorker extends Construct {
             workloadProfile: [{ name: 'Consumption', workloadProfileType: 'Consumption' }],
         });
 
-        const acrIdentity = new UserAssignedIdentity(this, environment.formatName('id', 'worker'), {
+        const identity = new UserAssignedIdentity(this, environment.formatName('id', 'worker'), {
             name: environment.formatName('id', 'worker'),
             location: environment.location,
             resourceGroupName: environment.resourceGroup,
@@ -110,8 +117,10 @@ export class DboteWorker extends Construct {
         const acrPull = new RoleAssignment(this, environment.formatName('role', 'worker-acr'), {
             scope: acr.id,
             roleDefinitionName: 'AcrPull',
-            principalId: acrIdentity.principalId,
+            principalId: identity.principalId,
         });
+        this.functionPrincipalId = identity.principalId;
+        this.identityClientId = identity.clientId;
 
         // Base app settings (SignalR/Service Bus connection settings are added by DboteGateway via
         // addAppSetting, since the Functions host parses them at startup to set up the triggers).
@@ -120,6 +129,9 @@ export class DboteWorker extends Construct {
             { name: 'AzureWebJobsStorage', value: functionStorageAccount.primaryConnectionString },
             { name: 'AzureWebJobsSecretStorageType', value: 'keyvault' },
             { name: 'AzureWebJobsSecretStorageKeyVaultUri', value: functionKeyVault.vaultUri },
+            { name: 'AzureWebJobsSecretStorageKeyVaultClientId', value: identity.clientId },
+            // DefaultAzureCredential (App Configuration, Service Bus senders) picks the identity from it.
+            { name: 'AZURE_CLIENT_ID', value: identity.clientId },
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: props.appInsightsConnection },
             { name: 'dbote__AppConfiguration__Endpoint', value: props.appConfigurationEndpoint },
             { name: 'dbote__AppConfiguration__Environment', value: environment.environment },
@@ -138,8 +150,8 @@ export class DboteWorker extends Construct {
             schemaValidationEnabled: false,
             dependsOn: [acrPull],
             identity: [{
-                type: 'SystemAssigned, UserAssigned',
-                identityIds: [acrIdentity.id],
+                type: 'UserAssigned',
+                identityIds: [identity.id],
             }],
             body: {
                 kind: 'functionapp',
@@ -153,7 +165,7 @@ export class DboteWorker extends Construct {
                             allowInsecure: false,
                             traffic: [{ latestRevision: true, weight: 100 }],
                         },
-                        registries: [{ server: acr.loginServer, identity: acrIdentity.id }],
+                        registries: [{ server: acr.loginServer, identity: identity.id }],
                     },
                     template: {
                         containers: [{
@@ -173,11 +185,9 @@ export class DboteWorker extends Construct {
             },
             responseExportValues: {
                 fqdn: 'properties.configuration.ingress.fqdn',
-                principalId: 'identity.principalId',
             },
         });
 
-        this.functionPrincipalId = Token.asString(Fn.lookup(workerApp.output, 'principalId'));
         const fqdn = Token.asString(Fn.lookup(workerApp.output, 'fqdn'));
         this.dboteEndpoint = `https://${fqdn}/api`;
 
@@ -188,7 +198,7 @@ export class DboteWorker extends Construct {
         this.signalREndpoint =
             `https://${fqdn}/runtime/webhooks/signalr?code={@Microsoft.KeyVault(SecretUri=${functionKeyVault.vaultUri}secrets/${signalRKeyName})}`;
 
-        // Role assignments: the worker's system-assigned identity needs data access to its host
+        // Role assignments: the worker's identity needs data access to its host
         // storage account (diagnostics/keys) and Key Vault (secret storage).
         new RoleAssignment(this, environment.formatName('role', 'func-st-blob'), {
             scope: functionStorageAccount.id,
