@@ -66,7 +66,8 @@ internal sealed class TestIdentityProvider : HttpMessageHandler, IHttpClientFact
         string issuer = Authority,
         string audience = Audience,
         TimeSpan? expiresIn = null,
-        SigningCredentials? signingCredentials = null)
+        SigningCredentials? signingCredentials = null,
+        object? peers = null)
     {
         var claims = new List<Claim>();
         if (clientId is not null) claims.Add(new Claim(JwtRegisteredClaimNames.Sub, clientId));
@@ -82,6 +83,7 @@ internal sealed class TestIdentityProvider : HttpMessageHandler, IHttpClientFact
             Expires = expires,
             Issuer = issuer,
             Audience = audience,
+            Claims = peers is null ? null : new Dictionary<string, object> { ["bote_peers"] = peers },
             SigningCredentials = signingCredentials
                 ?? new SigningCredentials(SigningKey, SecurityAlgorithms.EcdsaSha256),
         });

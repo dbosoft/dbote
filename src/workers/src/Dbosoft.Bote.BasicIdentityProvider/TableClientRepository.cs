@@ -30,6 +30,7 @@ public class TableClientRepository : IClientRepository
                 Id = entity.Value.RowKey,
                 PublicKey = entity.Value.PublicKey,
                 Scopes = entity.Value.Scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries),
+                Peers = (entity.Value.Peers ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries),
             };
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
@@ -45,6 +46,7 @@ public class TableClientRepository : IClientRepository
             RowKey = client.Id,
             PublicKey = client.PublicKey,
             Scopes = string.Join(' ', client.Scopes),
+            Peers = string.Join('\n', client.Peers),
         });
 
     private class ClientEntity : ITableEntity
@@ -53,6 +55,7 @@ public class TableClientRepository : IClientRepository
         public string RowKey { get; set; } = string.Empty;
         public string PublicKey { get; set; } = string.Empty;
         public string Scopes { get; set; } = string.Empty;
+        public string? Peers { get; set; }
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
     }

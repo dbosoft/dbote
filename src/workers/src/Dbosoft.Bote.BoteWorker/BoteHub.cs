@@ -71,7 +71,7 @@ internal partial class BoteHub(
                 new Claim(ClaimNames.TenantId, identity.TenantId),
                 new Claim(ClaimNames.ClientId, identity.ClientId),
                 // The hub calls see only these claims, not the token.
-                ..(decision.MayAddressPeers ? [new Claim(ClaimNames.MayAddressPeers, "true")] : Array.Empty<Claim>()),
+                ..(decision.Peers.IsNone ? Array.Empty<Claim>() : [new Claim(ClaimNames.Peers, decision.Peers.Format())]),
             ],
             CloseOnAuthenticationExpiration = true,
             TokenLifetime = TimeSpan.FromMinutes(15),
@@ -143,8 +143,33 @@ internal partial class BoteHub(
     }
 
 
-    private static bool MayAddressPeers(SignalRInvocationContext context) =>
-        context.Claims.TryGetValue(ClaimNames.MayAddressPeers, out var value) && value == "true";
+    /// <summary>
+    /// Whether a client of the caller's tenant holds a connection now. Only about the clients the
+    /// caller may send to, so presence tells nothing about the rest of the tenant.
+    /// </summary>
+    [Function(nameof(IsClientConnected))]
+    public async Task<bool> IsClientConnected(
+        [SignalRTrigger(
+            HubName,
+            "messages",
+            nameof(IsClientConnected),
+            nameof(clientId),
+            ConnectionStringSetting = "dbote:Worker:SignalR:Connection")]
+        SignalRInvocationContext invocationContext,
+        string clientId)
+    {
+        var tenantId = ExtractTenantId(invocationContext);
+        var callerId = ExtractClientId(invocationContext);
+
+        if (clientId != callerId && !(BoteIds.IsPathSegment(clientId) && Peers(invocationContext).Allows(clientId)))
+            throw new UnauthorizedAccessException($"Client '{clientId}' is not among the caller's peers.");
+
+        return await ClientManager.UserExistsAsync(BoteClientNames.SignalRUserId(tenantId, clientId));
+    }
+
+
+    private static BotePeers Peers(SignalRInvocationContext context) =>
+        BotePeers.Parse(context.Claims.TryGetValue(ClaimNames.Peers, out var value) ? value.ToString() : null);
 
     private static string ExtractTenantId(SignalRInvocationContext context)
     {

@@ -79,13 +79,13 @@ as a Key Vault reference, which SignalR resolves with its own identity.
 | `JwksUri` | yes | Where the issuer's signing keys are published. |
 | `Audience` | yes | The audience the tokens must name. |
 | `RequiredScope` | yes | A scope every token must carry (scopes are a space-separated set); without it the worker refuses every client. |
-| `PeerScope` | no | A client whose token carries this scope too may send to the other clients of its tenant, e.g. `bote.peer`. Unset, clients only talk to the cloud. |
+| `PeerScope` | no | A client whose token carries this scope too may send to the clients of its tenant its token lists in `bote_peers`, e.g. `bote.peer`. Unset, clients only talk to the cloud. |
 
 The worker takes the client from `sub` and the tenant from `tid`. It accepts ES256 tokens only,
 reloads the keys when a token names an unknown key (at most every 30 seconds) and keeps using the
 known keys while the issuer is unreachable. Tenant and client ids must not contain `/`, `\` or
 control characters, nor be `.` or `..`. `BasicIdentityProvider` is for development; an application
-brings its own issuer.
+brings its own issuer, which has to meet [identity-provider.md](identity-provider.md).
 
 ## Resources the worker expects
 
@@ -138,7 +138,11 @@ Attachment ids are checked like tenant ids before they become part of a path.
 
 ## Roles for a managed identity
 
-What the reference deployment grants the worker's identity:
+What the reference deployment grants the worker's identity. It is a user-assigned identity, whose
+id is known before the app exists and stays the same when the app changes, so its role
+assignments are never replaced. With one, set `AZURE_CLIENT_ID`,
+`AzureWebJobsSecretStorageKeyVaultClientId` and the `clientId` of each identity-based connection to
+its client id.
 
 | Resource | Role |
 | --- | --- |
@@ -156,16 +160,20 @@ upstream URL. The rights the cloud side needs are in [cloud-without-rebus.md](cl
 ## Clients talking to each other
 
 With `OpenId:PeerScope` set, a client whose token carries that scope may send to
-`{Queues:Clients}-{otherClientId}`. The worker keeps the sender's tenant, so a client can never reach
+`{Queues:Clients}-{otherClientId}` for every client its token lists in the `bote_peers` claim
+(`*` for all clients of the tenant). The worker keeps the sender's tenant, so a client can never reach
 another tenant, puts the message on the clients queue and delivers it like a message from the cloud,
 with the sender in `dbote-sender-client-id`. The receiver answers the same way (a Rebus reply goes to
-the sender's queue), so both need the scope. Use it for a client that has to ask another one, e.g. an
+the sender's queue), so both need the scope, and each the other in its list. Use it for a client that has to ask another one, e.g. an
 application instance in the cloud that needs a system on the customer's premises through the agent
 there.
 
-- The receiver decides whom it answers: the worker lets any client with the scope reach any client
-  of its tenant that has connected once, and only names the sender. Check `dbote-sender-client-id`
-  before acting on a request.
+- The identity provider decides who may reach whom; a token with the scope but without the list
+  reaches no one. The receiver has its own say: `BoteTransportOptions.AcceptPeer` refuses messages
+  from other clients before any handler sees them and moves them to the error queue.
+- `BoteTransportOptions.Presence` tells whether a client among its peers is connected now.
+  The cloud side asks the SignalR service (hub `BoteHub`) whether the user
+  `BoteClientNames.SignalRUserId(tenant, client)` exists.
 - On a message a client deferred to itself the header is what that client passed on, not
   confirmed by the worker.
 - A receiver that never connected is refused at the sender; so is a message too large for a
@@ -173,6 +181,19 @@ there.
 - Answers go to the sender's queue whatever return address the sender wrote.
 - Messages to clients are not deduplicated: a sender that retries after a timeout may deliver
   twice. Make handlers idempotent on the message id.
+
+## Tracing
+
+The worker keeps a message in its sender's trace. A client's message that carries a W3C
+`traceparent` header is sent on to Service Bus within that trace (as `Diagnostic-Id`, which the
+Functions trigger on the cloud side continues), and the worker's logs for it belong to it. A message
+to a client gets the trace of the cloud's send in `traceparent`, unless it carries one already.
+
+## Metrics
+
+`GET /api/Metrics` (with the host's master key) returns the worker's timings and the count of
+messages between clients: sent, and refused because the sender may not reach the receiver or the
+receiver never connected. Each one sent is also logged with sender, receiver and message id.
 
 ## Limits
 
@@ -196,6 +217,10 @@ there.
   hyphens or is longer than 24 characters, and refuses tokens whose tenant or client id contains
   `/`, `\` or control characters or ends in a dot.
 - `ITenantStorageResolver` has a separate `ResolveErrorQueueClient`.
+- A client with the peer scope reaches only the clients its token lists in `bote_peers`; tokens
+  without the claim reach no other client.
+- The reference deployment runs the worker as its user-assigned identity, not a system-assigned
+  one. The switch replaces the worker's role assignments once.
 
 ## Setting up a new application
 

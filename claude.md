@@ -16,8 +16,8 @@ quotas per tenant are the application's business, not missing features of the ga
   (`BoteHeaderPolicy`, an allow-list). A new `dbote-*` header is therefore refused by default;
   keep it that way. `SendMessage` overwrites the sender header with the true sender.
 - Where a client may send is `BoteQueuePolicy`: the cloud queue, its own queue (Rebus defer), and
-  with the peer scope the queue of another client that has connected once - always within the
-  sender's tenant. `ClientSendRules` stamps tenant, client, sender and the return address (always
+  with the peer scope the queue of another client its token lists in `bote_peers` (`BotePeers`)
+  that has connected once - always within the sender's tenant. Presence answers only about those. `ClientSendRules` stamps tenant, client, sender and the return address (always
   the sender's own queue, or a client could have the cloud or a peer answer to someone else) and
   refuses messages scheduled more than 7 days ahead or too large for a storage queue.
 - Everything the worker keeps per client is named by `BoteClientNames` (hash of tenant and
@@ -106,8 +106,8 @@ dotnet test Dbote.sln                # integration tests start Azurite via Testc
 | Area | Where |
 | --- | --- |
 | Worker functions | `src/workers/src/Dbosoft.Bote.BoteWorker/BoteHub.cs` (negotiate, queue SAS), `BoteHub.Messages.cs` (client sends, delivery, attachment readiness), `BoteHub.DataBus.cs` (attachment SAS, uploads, peer copies), `BoteHub.Subscriptions.cs` (topics), `DataBusCopyFile.cs` (outbox trigger, copy monitor) |
-| Worker auth | `TokenValidationService.cs`, `NegotiateAuthorizer.cs`, `ClientIdentity.cs`, `OpenIdOptions.cs` |
-| Shared rules | `src/Dbosoft.Bote.Primitives`: `BoteHeaders`, `BoteHeaderPolicy`, `BoteQueuePolicy`, `BoteClientNames`, `BoteIds`, `BoteAttachmentIds`, `BoteStorageConstants`, `DataBusSasUriValidator` |
+| Worker auth | `TokenValidationService.cs`, `NegotiateAuthorizer.cs`, `ClientIdentity.cs`, `OpenIdOptions.cs`; what the IdP must do: `docs/identity-provider.md` |
+| Shared rules | `src/Dbosoft.Bote.Primitives`: `BoteHeaders`, `BoteHeaderPolicy`, `BoteQueuePolicy`, `BoteClientNames`, `BoteIds`, `BotePeers`, `BoteAttachmentIds`, `BoteStorageConstants`, `DataBusSasUriValidator` |
 | Cloud side, Rebus | `src/Dbosoft.Bote.Rebus.Integration`: `BoteConfigurationExtensions` (`EnableBote`, `EnableBoteDataBus`), `BoteNameFormatter` (`{clients}-{id}` → clients queue), `Pipeline/*` |
 | Cloud side, no Rebus | `src/Dbosoft.Bote.Cloud`: `BoteIncomingMessage`, `BoteCloudSender`, `RebusWireFormat` |
 | Client transport | `src/client/src/Dbosoft.Bote.Rebus`: `Transport/BoteTransport.cs`, `SignalRClient.cs`, `PendingMessagesIndicator.cs`, `BoteDataBus.cs`, `Subscriptions/BoteSubscriptionStorage.cs` |

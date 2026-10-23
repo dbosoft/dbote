@@ -53,4 +53,16 @@ public class BoteTransportOptions
     /// is one empty poll per minute on an idle client - negligible compared to continuous polling.
     /// </summary>
     public TimeSpan PendingMessagesReconcileInterval { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// Which other clients of its tenant this client takes messages from, by their client id.
+    /// The worker lets a client send only to the clients its identity provider allows; this is
+    /// the receiver's own say. A message from a client it refuses goes to the error queue
+    /// without reaching a handler. Messages from the cloud are not affected. Defaults to
+    /// <c>null</c>: every client the worker lets through.
+    /// </summary>
+    public Func<string, bool>? AcceptPeer { get; set; }
+
+    /// <summary>Asks whether other clients are connected, once the bus is started.</summary>
+    public BotePresence Presence { get; } = new();
 }

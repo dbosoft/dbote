@@ -39,14 +39,16 @@ internal partial class BoteHub
         var clientId = ExtractClientId(invocationContext);
 
 
-        // Clients send to the cloud queue, to their own queue to defer a message, or - with the
-        // peer scope - to another client of their tenant.
+        // Clients send to the cloud queue, to their own queue to defer a message, or to another
+        // client of their tenant the identity provider lets them reach.
         var route = BoteQueuePolicy.ResolveClientSendRoute(queue,
             serviceBusOptions.Value.Queues.Cloud, serviceBusOptions.Value.Queues.Clients, clientId,
-            MayAddressPeers(invocationContext));
+            Peers(invocationContext));
 
         if (route is null)
         {
+            if (queue.StartsWith($"{serviceBusOptions.Value.Queues.Clients}-", StringComparison.Ordinal))
+                workerMetrics.PeerRefused();
             logger.LogWarning("Client {TenantId}-{ClientId} attempted to send to unauthorized queue: {Queue}",
                 tenantId, clientId, queue);
             throw new UnauthorizedAccessException($"Queue '{queue}' is not allowed");
@@ -65,6 +67,8 @@ internal partial class BoteHub
             throw new UnauthorizedAccessException(
                 $"Attempted to set disallowed header(s): {string.Join(", ", disallowedHeaders)}");
         }
+
+        using var trace = BoteTracing.ContinueClientTrace(message.Headers, nameof(SendMessage));
 
         var tsb = Stopwatch.GetTimestamp();
         var serviceBusMessage = messageConverter.ToServiceBus(message);
@@ -86,8 +90,13 @@ internal partial class BoteHub
             // cannot have the worker make queues for any name it likes.
             var receiverQueue = await tenantStorageResolver.ResolveQueueClient(tenantId, route.ClientId!);
             if (!(await receiverQueue.ExistsAsync()).Value)
+            {
+                workerMetrics.PeerRefused();
                 throw new InvalidOperationException($"Client '{route.ClientId}' is not known.");
+            }
 
+            // The audit trail of client-to-client traffic.
+            workerMetrics.PeerSent();
             logger.LogInformation("Client {TenantId}/{ClientId} sends {MessageId} to {Receiver}",
                 tenantId, clientId, serviceBusMessage.MessageId, route.ClientId);
         }
@@ -139,6 +148,7 @@ internal partial class BoteHub
 
         if (sasUri != null)
             serviceBusMessage.ApplicationProperties[BoteHeaders.DataBusInboxSas] = sasUri.ToString();
+        BoteTracing.Stamp(serviceBusMessage.ApplicationProperties);
 
         var asb = Stopwatch.GetTimestamp();
         await senderCache.GetSender(targetQueueName).SendMessageAsync(serviceBusMessage);
@@ -217,6 +227,8 @@ internal partial class BoteHub
         // sender's token, it tells the receiver who is asking.
         if (message.ApplicationProperties.TryGetValue(BoteHeaders.SenderClientId, out var senderClientId))
             boteMsg.Headers[BoteHeaders.SenderClientId] = senderClientId.ToString()!;
+        // The trigger runs in the trace of whoever sent the message; the client continues it.
+        BoteTracing.Stamp(boteMsg.Headers);
 
         logger.LogInformation("Ready to forward message {MessageId} to tenant {TenantId}", 
             message.MessageId, tenantId);

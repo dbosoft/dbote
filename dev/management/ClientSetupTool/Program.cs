@@ -42,6 +42,7 @@ foreach (var client in clients)
             Id = client.ClientId,
             PublicKey = client.PublicKey,
             Scopes = client.Scopes ?? [],
+            Peers = client.Peers ?? [],
         };
 
         var response = await httpClient.PostAsJsonAsync($"{identityProviderUrl}/api/register-client", payload);

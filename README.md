@@ -26,7 +26,8 @@ cloud ◄──Service Bus── BoteWorker ◄──SignalR── client
   their own Storage Queue to receive.
 - **Identity provider** - the application's own OAuth server. A client proves itself with a JWT
   signed by its own ECDSA P-256 key and gets an access token naming its tenant (`tid`) and
-  client (`sub`). `BasicIdentityProvider` in this repository is for development only.
+  client (`sub`). What it has to do: [docs/identity-provider.md](docs/identity-provider.md).
+  `BasicIdentityProvider` in this repository is for development only.
 
 ### Queues and storage
 
@@ -54,7 +55,7 @@ run on one namespace, one worker and one storage account.
   other `dbote-*` header the client set, sets tenant and client from the client's token and puts
   the message on the cloud queue.
 - **Client → client**: a client whose token carries the worker's peer scope may also send to
-  another client of its own tenant, e.g. an application instance in the cloud asking an agent on
+  the clients of its own tenant its token lists, e.g. an application instance in the cloud asking an agent on
   the customer's premises. The worker names the sender in the message; the tenant stays the
   sender's, so there is no way to address another tenant.
 - **Attachments** travel as blobs: the sender uploads, the worker copies to where the receiver may
@@ -121,7 +122,9 @@ configure
 
 A client with the peer scope sends to another client of its tenant by its queue,
 `bus.Advanced.Routing.Send($"{clientsQueue}-{otherClientId}", message)`, and finds the sender in
-the `dbote-sender-client-id` header. A message with an attachment names it in
+the `dbote-sender-client-id` header. `BoteTransportOptions.AcceptPeer` limits whom a client takes
+messages from, `BoteTransportOptions.Presence.IsConnected(otherClientId)` asks whether a peer is
+online. A message with an attachment names it in
 `dbote-attachment-id`.
 
 ## Local development

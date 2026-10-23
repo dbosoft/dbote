@@ -13,8 +13,8 @@ public enum ClientSendTarget
     Self,
 
     /// <summary>
-    /// To another client of the same tenant, through the clients queue. Only for clients the
-    /// identity provider allows to (the worker's peer scope).
+    /// To another client of the same tenant, through the clients queue. Only to the clients the
+    /// identity provider lets the sender reach (<see cref="BotePeers"/>).
     /// </summary>
     Peer,
 }
@@ -26,15 +26,15 @@ public sealed record ClientSendRoute(ClientSendTarget Target, string? ClientId =
 
 /// <summary>
 /// Trust-boundary policy for the queue a client names when it sends: the cloud queue, its own
-/// queue <c>{clients}-{clientId}</c>, or - if it may address its peers - the queue of another
-/// client <c>{clients}-{otherClientId}</c>. The tenant is never part of the address: the
+/// queue <c>{clients}-{clientId}</c>, or the queue <c>{clients}-{otherClientId}</c> of another
+/// client among its <see cref="BotePeers"/>. The tenant is never part of the address: the
 /// worker always delivers within the sender's tenant.
 /// </summary>
 public static class BoteQueuePolicy
 {
     /// <returns>The route, or <c>null</c> when the client may not send to <paramref name="queue"/>.</returns>
     public static ClientSendRoute? ResolveClientSendRoute(
-        string queue, string cloudQueue, string clientsQueue, string clientId, bool mayAddressPeers = false)
+        string queue, string cloudQueue, string clientsQueue, string clientId, BotePeers? peers = null)
     {
         if (string.IsNullOrEmpty(queue) || string.IsNullOrEmpty(clientId))
             return null;
@@ -51,7 +51,7 @@ public static class BoteQueuePolicy
             return new ClientSendRoute(ClientSendTarget.Self, clientId);
 
         // The receiver's id ends up in names and paths; the same rule as for a token's ids.
-        return mayAddressPeers && BoteIds.IsPathSegment(receiver)
+        return peers is not null && peers.Allows(receiver) && BoteIds.IsPathSegment(receiver)
             ? new ClientSendRoute(ClientSendTarget.Peer, receiver)
             : null;
     }

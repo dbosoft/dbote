@@ -1,4 +1,5 @@
 using System.Net;
+using Dbosoft.Bote.Primitives;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -55,18 +56,32 @@ internal sealed class NegotiateAuthorizer(
             return NegotiateDecision.Deny(HttpStatusCode.Forbidden);
         }
 
-        var peerScope = openIdOptions.Value.PeerScope;
-        var mayAddressPeers = !string.IsNullOrEmpty(peerScope) && scopes.Contains(peerScope, StringComparer.Ordinal);
+        return NegotiateDecision.Allow(identity, Peers(token, scopes, identity));
+    }
 
-        return NegotiateDecision.Allow(identity, mayAddressPeers);
+    // The peer scope lets a client send to other clients, the token's list says to which.
+    private BotePeers Peers(JsonWebToken token, string[] scopes, ClientIdentity identity)
+    {
+        var peerScope = openIdOptions.Value.PeerScope;
+        if (string.IsNullOrEmpty(peerScope) || !scopes.Contains(peerScope, StringComparer.Ordinal))
+            return BotePeers.None;
+
+        // An array claim comes as one claim per entry.
+        var peers = BotePeers.Of(token.Claims
+            .Where(c => c.Type == BotePeers.TokenClaim)
+            .Select(c => c.Value));
+        if (peers.IsNone)
+            logger.LogWarning("Client {TenantId}/{ClientId} has the peer scope but no {Claim} claim; it reaches no other client",
+                identity.TenantId, identity.ClientId, BotePeers.TokenClaim);
+        return peers;
     }
 }
 
-/// <param name="MayAddressPeers">Whether the client may send to the other clients of its tenant.</param>
-internal sealed record NegotiateDecision(ClientIdentity? Identity, HttpStatusCode Status, bool MayAddressPeers = false)
+/// <param name="Peers">The clients of its tenant the client may send to.</param>
+internal sealed record NegotiateDecision(ClientIdentity? Identity, HttpStatusCode Status, BotePeers Peers)
 {
-    public static NegotiateDecision Allow(ClientIdentity identity, bool mayAddressPeers = false) =>
-        new(identity, HttpStatusCode.OK, mayAddressPeers);
+    public static NegotiateDecision Allow(ClientIdentity identity, BotePeers? peers = null) =>
+        new(identity, HttpStatusCode.OK, peers ?? BotePeers.None);
 
-    public static NegotiateDecision Deny(HttpStatusCode status) => new(null, status);
+    public static NegotiateDecision Deny(HttpStatusCode status) => new(null, status, BotePeers.None);
 }

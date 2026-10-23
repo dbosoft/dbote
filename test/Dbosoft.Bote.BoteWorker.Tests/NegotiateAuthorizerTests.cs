@@ -1,5 +1,6 @@
 using System.Net;
 using AwesomeAssertions;
+using Dbosoft.Bote.Primitives;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Dbosoft.Bote.BoteWorker.Tests;
@@ -108,7 +109,7 @@ public class NegotiateAuthorizerTests
         var decision = await Authorize($"Bearer {_idp.Issue(scope: "other bote")}");
 
         decision.Status.Should().Be(HttpStatusCode.OK);
-        decision.MayAddressPeers.Should().BeFalse();
+        decision.Peers.Should().BeSameAs(BotePeers.None);
     }
 
     [Theory]
@@ -118,10 +119,41 @@ public class NegotiateAuthorizerTests
     [InlineData("bote bote.peerx", "bote.peer", false)]
     public async Task Only_the_peer_scope_lets_a_client_address_its_peers(string scope, string? peerScope, bool expected)
     {
-        var decision = await Authorize($"Bearer {_idp.Issue(scope: scope)}", peerScope: peerScope);
+        var decision = await Authorize($"Bearer {_idp.Issue(scope: scope, peers: new[] { "*" })}", peerScope: peerScope);
 
         decision.Status.Should().Be(HttpStatusCode.OK);
-        decision.MayAddressPeers.Should().Be(expected);
+        decision.Peers.Allows("client-b").Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task The_token_names_the_peers()
+    {
+        var decision = await Authorize($"Bearer {_idp.Issue(scope: "bote bote.peer", peers: new[] { "agent-1", "agent-2", "../x" })}",
+            peerScope: "bote.peer");
+
+        decision.Peers.Allows("agent-1").Should().BeTrue();
+        decision.Peers.Allows("agent-2").Should().BeTrue();
+        decision.Peers.Allows("agent-3").Should().BeFalse();
+        decision.Peers.Allows("../x").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_single_peer_may_be_a_string()
+    {
+        var decision = await Authorize($"Bearer {_idp.Issue(scope: "bote bote.peer", peers: "instance")}",
+            peerScope: "bote.peer");
+
+        decision.Peers.Allows("instance").Should().BeTrue();
+        decision.Peers.Allows("other").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task The_peer_scope_without_a_list_reaches_no_one()
+    {
+        var decision = await Authorize($"Bearer {_idp.Issue(scope: "bote bote.peer")}", peerScope: "bote.peer");
+
+        decision.Status.Should().Be(HttpStatusCode.OK);
+        decision.Peers.IsNone.Should().BeTrue();
     }
 
     [Fact]

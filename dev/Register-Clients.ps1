@@ -35,6 +35,7 @@ try {
                 Id = $client.ClientId
                 PublicKey = $client.PublicKey
                 Scopes = @(if ($client.PSObject.Properties['Scopes']) { $client.Scopes })
+                Peers = @(if ($client.PSObject.Properties['Peers']) { $client.Peers })
             } | ConvertTo-Json
 
             $response = Invoke-WebRequest `

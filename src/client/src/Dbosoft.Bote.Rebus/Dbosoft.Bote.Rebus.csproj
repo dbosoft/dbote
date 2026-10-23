@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Dbosoft.Bote.Client.Authentication\Dbosoft.Bote.Client.Authentication.csproj" />
     <ProjectReference Include="..\Dbosoft.Bote.Transport.Abstractions\Dbosoft.Bote.Transport.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Dbosoft.Bote.Primitives\Dbosoft.Bote.Primitives.csproj" />
   </ItemGroup>
 
 </Project>

@@ -34,6 +34,8 @@ internal interface ISignalRClient
 
     // DataBus - Read metadata (filtered, without internal metadata)
     Task<Dictionary<string, string>> GetAttachmentMetadata(string attachmentId);
+
+    Task<bool> IsClientConnected(string clientId) => throw new NotSupportedException();
 }
 
 // TODO handle reconnects
@@ -151,6 +153,11 @@ internal class SignalRClient(
     public async Task<Dictionary<string, string>> GetAttachmentMetadata(string attachmentId)
     {
         return await _connection!.InvokeAsync<Dictionary<string, string>>("GetAttachmentMetadata", attachmentId);
+    }
+
+    public async Task<bool> IsClientConnected(string clientId)
+    {
+        return await _connection!.InvokeAsync<bool>("IsClientConnected", clientId);
     }
 
     // TODO review

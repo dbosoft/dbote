@@ -5,8 +5,8 @@ namespace Dbosoft.Bote.Rebus.IntegrationTests;
 
 public class BoteQueuePolicyTests
 {
-    private static ClientSendRoute? Resolve(string queue, bool mayAddressPeers = false) =>
-        BoteQueuePolicy.ResolveClientSendRoute(queue, "bote-cloud", "bote-clients", "client-a", mayAddressPeers);
+    private static ClientSendRoute? Resolve(string queue, BotePeers? peers = null) =>
+        BoteQueuePolicy.ResolveClientSendRoute(queue, "bote-cloud", "bote-clients", "client-a", peers);
 
     [Fact]
     public void Client_sends_to_the_cloud_or_itself()
@@ -25,11 +25,24 @@ public class BoteQueuePolicyTests
         Resolve(queue).Should().BeNull();
 
     [Fact]
-    public void Client_with_the_peer_scope_sends_to_another_client()
+    public void Client_sends_to_every_client_of_its_tenant_when_allowed_all()
     {
-        Resolve("bote-clients-client-b", mayAddressPeers: true)
+        Resolve("bote-clients-client-b", BotePeers.All)
             .Should().Be(new ClientSendRoute(ClientSendTarget.Peer, "client-b"));
-        Resolve("bote-clients-client-a", mayAddressPeers: true)
+        Resolve("bote-clients-client-a", BotePeers.All)
+            .Should().Be(new ClientSendRoute(ClientSendTarget.Self, "client-a"));
+    }
+
+    [Fact]
+    public void Client_sends_only_to_the_peers_it_is_allowed()
+    {
+        var peers = BotePeers.Of(["client-b"]);
+
+        Resolve("bote-clients-client-b", peers).Should().Be(new ClientSendRoute(ClientSendTarget.Peer, "client-b"));
+        Resolve("bote-clients-client-c", peers).Should().BeNull();
+        Resolve("bote-clients-Client-B", peers).Should().BeNull();
+        // its own queue needs no permission
+        Resolve("bote-clients-client-a", BotePeers.None)
             .Should().Be(new ClientSendRoute(ClientSendTarget.Self, "client-a"));
     }
 
@@ -40,7 +53,7 @@ public class BoteQueuePolicyTests
     [InlineData("bote-error")]
     [InlineData("bote-cloud-incoming")]
     public void Peers_are_only_client_queues(string queue) =>
-        Resolve(queue, mayAddressPeers: true).Should().BeNull();
+        Resolve(queue, BotePeers.All).Should().BeNull();
 
     [Fact]
     public void Client_without_id_has_no_own_queue() =>

@@ -52,6 +52,14 @@ public sealed class WorkerMetrics
     public PhaseMeter OutSignalRNotify { get; } = new();
     public PhaseMeter OutForwardTotal { get; } = new();
 
+    // Client-to-client traffic: sent, and refused because the sender may not reach the receiver
+    // or the receiver never connected.
+    private long _peerSent;
+    private long _peerRefused;
+
+    public void PeerSent() => Interlocked.Increment(ref _peerSent);
+    public void PeerRefused() => Interlocked.Increment(ref _peerRefused);
+
     /// <summary>Elapsed milliseconds since a <see cref="Stopwatch.GetTimestamp"/> mark.</summary>
     public static double MsSince(long startTimestamp) =>
         (Stopwatch.GetTimestamp() - startTimestamp) * 1000.0 / Stopwatch.Frequency;
@@ -71,6 +79,11 @@ public sealed class WorkerMetrics
             serialize = OutSerialize.Snapshot(),
             storageSend = OutStorageSend.Snapshot(),
             signalRNotify = OutSignalRNotify.Snapshot(),
+        },
+        peers = new
+        {
+            sent = Interlocked.Read(ref _peerSent),
+            refused = Interlocked.Read(ref _peerRefused),
         },
     };
 }

@@ -74,8 +74,14 @@ public static class BoteConfigurationExtensions
         {
             var pipeline = c.Get<IPipeline>();
 
-            return new PipelineStepRemover(pipeline)
+            var withoutDeferredMessagesStep = new PipelineStepRemover(pipeline)
                 .RemoveIncomingStep(s => s.GetType() == typeof(HandleDeferredMessagesStep));
+
+            return options.AcceptPeer is { } acceptPeer
+                ? new PipelineStepInjector(withoutDeferredMessagesStep)
+                    .OnReceive(new PeerSenderStep(acceptPeer), PipelineRelativePosition.Before,
+                        typeof(DeserializeIncomingMessageStep))
+                : withoutDeferredMessagesStep;
         });
 
 
@@ -83,7 +89,12 @@ public static class BoteConfigurationExtensions
             .Register(_ => new PendingMessagesIndicators());
 
         configurer.OtherService<ISignalRClient>()
-            .Register(signalRClientFactory);
+            .Register(c =>
+            {
+                var signalRClient = signalRClientFactory(c);
+                options.Presence.Attach(signalRClient);
+                return signalRClient;
+            });
 
         configurer.OtherService<BoteTransport>().Register(c =>
         {

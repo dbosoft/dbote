@@ -16,6 +16,9 @@ public class ClientInfo
 
     /// <summary>Scopes the client gets besides <c>bote</c>, e.g. the worker's peer scope.</summary>
     public string[] Scopes { get; set; } = [];
+
+    /// <summary>The clients of its tenant it may send to (<c>*</c> for all), with the peer scope.</summary>
+    public string[] Peers { get; set; } = [];
 }
 
 public class InMemoryClientRepository : IClientRepository

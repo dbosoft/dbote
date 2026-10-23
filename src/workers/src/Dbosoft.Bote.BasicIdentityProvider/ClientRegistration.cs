@@ -27,6 +27,9 @@ public class ClientRegistration(
         client.Scopes ??= [];
         if (client.Scopes.Any(s => string.IsNullOrWhiteSpace(s) || s.Any(char.IsWhiteSpace)))
             return new BadRequestObjectResult(new { error = "A scope is a single word." });
+        client.Peers ??= [];
+        if (client.Peers.Any(p => string.IsNullOrEmpty(p) || p.Any(char.IsControl) || p.Contains('/') || p.Contains('\\')))
+            return new BadRequestObjectResult(new { error = "A peer is a client id or *." });
 
         await clientRepository.Register(client);
 

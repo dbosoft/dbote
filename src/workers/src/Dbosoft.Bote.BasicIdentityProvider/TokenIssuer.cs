@@ -85,7 +85,7 @@ public class TokenIssuer(
 
         // bote, which every client needs, and what the client was registered with.
         var scope = string.Join(' ', client.Scopes.Prepend("bote").Distinct());
-        var accessToken = CreateAccessToken(tenantId, clientId, scope);
+        var accessToken = CreateAccessToken(tenantId, clientId, scope, client.Peers);
         return new JsonResult(new Dictionary<string, object>()
         {
             [OpenIdConnectParameterNames.AccessToken] = accessToken,
@@ -95,7 +95,7 @@ public class TokenIssuer(
         });
     }
 
-    private string CreateAccessToken(string tenantId, string clientId, string scope)
+    private string CreateAccessToken(string tenantId, string clientId, string scope, string[] peers)
     {
         var tokenCredentials = tokenCredentialsProvider.GetSigningCredentials();
         var handler = new JsonWebTokenHandler();
@@ -114,6 +114,8 @@ public class TokenIssuer(
             SigningCredentials = tokenCredentials,
             Audience = options.Value.Audience,
             Issuer = options.Value.Authority,
+            // An array, whom the client may send to; the worker reads it with its peer scope.
+            Claims = peers.Length == 0 ? null : new Dictionary<string, object> { ["bote_peers"] = peers },
         };
 
         return handler.CreateToken(tokenDescriptor);
