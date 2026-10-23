@@ -131,11 +131,10 @@ identity provider stops issuing tokens to a client:
 
 ## Off-the-shelf identity providers
 
-Entra ID and Azure AD B2C still cannot issue these tokens as they are: although the worker now
-accepts RS256, they put an application's permissions in `roles` instead of `scope` and use `tid`
-for their own directory. An application needs an issuer it controls — for example a token service
-of its own, OpenIddict or Duende IdentityServer — configured for RS256 or ES256 and the claims
-above.
+Entra ID and Azure AD B2C cannot issue these tokens as they are: they put an application's
+permissions in `roles` instead of `scope` and use `tid` for their own directory. An application
+needs an issuer it controls — for example a token service of its own, OpenIddict or Duende
+IdentityServer — configured for RS256 or ES256 and the claims above.
 
 ## Checklist
 
