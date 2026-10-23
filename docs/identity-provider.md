@@ -16,7 +16,7 @@ client                      identity provider                 worker
   | signed with client key)   |                                  |
   |-------------------------->| checks it against the            |
   |                           | registered public key            |
-  |<--------------------------| access token (ES256):            |
+  |<--------------------------| access token (RS256/ES256):      |
   |   tid, sub, scope, bote_peers                                |
   |------------------------------------------------------------->| negotiate: validates against
   |                                                              | the JWKS, opens a SignalR
@@ -50,6 +50,7 @@ The client assertion is signed with ES256 by the client's own ECDSA P-256 key an
 | `jti` | a new GUID for every assertion |
 | `nbf`, `exp` | now, and five minutes later |
 | header `kid` | the key id of the client's signing key |
+| header `typ` | `client-authentication+jwt` (explicit typing, RFC 8725; the identity provider requires it) |
 
 The identity provider must:
 
@@ -70,7 +71,7 @@ Rotating a client's key: register the new public key next to the old one and tel
 
 | | Requirement |
 | --- | --- |
-| Signature | ES256 (ECDSA P-256 with SHA-256). The worker refuses every other algorithm, RS256 included. |
+| Signature | RS256 (RSA) or ES256 (ECDSA P-256). The worker accepts these two asymmetric algorithms and refuses every other (no HMAC, no `none`). A production issuer such as OpenIddict signs RS256; the development BasicIdentityProvider signs ES256. |
 | header `kid` | The id of the signing key in the JWKS. Without it rotation cannot work (see below). |
 | `iss` | Exactly the worker's `OpenId:Authority`, character for character. |
 | `aud` | Contains the worker's `OpenId:Audience`. |
@@ -111,7 +112,8 @@ talks to many.
 ## Signing keys (JWKS)
 
 - Publish the signing keys as a JSON Web Key Set at the worker's `OpenId:JwksUri`, over HTTPS and
-  reachable from the worker: `kty` `EC`, `crv` `P-256`, `x`, `y`, `kid`.
+  reachable from the worker: RSA keys (`kty` `RSA`, `n`, `e`, `kid`) or EC keys (`kty` `EC`,
+  `crv` `P-256`, `x`, `y`, `kid`), matching the signing algorithm (RS256 / ES256).
 - The worker caches the set for an hour. A token whose `kid` it does not know makes it load the
   set again, at most every 30 seconds, so a new key works within moments of being published.
 - Rotation: publish the new key, then sign with it. Keep the old key published until the last
@@ -129,17 +131,19 @@ identity provider stops issuing tokens to a client:
 
 ## Off-the-shelf identity providers
 
-Entra ID and Azure AD B2C cannot issue these tokens as they are: they sign with RS256, put an
-application's permissions in `roles` instead of `scope`, and use `tid` for their own directory.
-An application needs an issuer it controls, for example a token service of its own,
-OpenIddict or Duende IdentityServer, configured for ES256 and the claims above.
+Entra ID and Azure AD B2C still cannot issue these tokens as they are: although the worker now
+accepts RS256, they put an application's permissions in `roles` instead of `scope` and use `tid`
+for their own directory. An application needs an issuer it controls — for example a token service
+of its own, OpenIddict or Duende IdentityServer — configured for RS256 or ES256 and the claims
+above.
 
 ## Checklist
 
 - [ ] Client credentials with private key JWT, assertion verified against the registered P-256 key
 - [ ] `jti` replay refused
 - [ ] Tenant taken from the registration
-- [ ] Access token ES256 with `kid`
+- [ ] Access token RS256 or ES256 with `kid`
+- [ ] Client assertion explicitly typed `typ: client-authentication+jwt`
 - [ ] `iss`, `aud`, `exp` as the worker is configured
 - [ ] `sub`, `tid`, `scope` (a string), `bote_peers` for clients that talk to other clients
 - [ ] Scopes and peers granted from the registration

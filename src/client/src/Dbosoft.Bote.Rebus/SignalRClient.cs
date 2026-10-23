@@ -184,6 +184,8 @@ internal class SignalRClient(
             Audience = credentials.Authority,
             Issuer = credentials.ClientId,
             IncludeKeyIdInHeader = true,
+            // Explicitly type the client assertion (RFC 8725); the identity provider (OpenIddict) requires this typ.
+            TokenType = "client-authentication+jwt",
         };
 
         var jwt = handler.CreateToken(tokenDescriptor);

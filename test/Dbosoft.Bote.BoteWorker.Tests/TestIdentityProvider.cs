@@ -26,9 +26,13 @@ internal sealed class TestIdentityProvider : HttpMessageHandler, IHttpClientFact
     {
         SigningKey = NewKey("key-1");
         _published = [SigningKey];
+        RsaKey = new RsaSecurityKey(RSA.Create(2048)) { KeyId = "rsa-1" };
     }
 
     public ECDsaSecurityKey SigningKey { get; private set; }
+
+    /// <summary>An RSA key, published alongside the EC keys, to issue RS256 tokens like a production issuer.</summary>
+    public RsaSecurityKey RsaKey { get; }
 
     public FakeTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
 
@@ -100,7 +104,7 @@ internal sealed class TestIdentityProvider : HttpMessageHandler, IHttpClientFact
         var keys = _published.Select(k =>
         {
             var p = k.ECDsa.ExportParameters(false);
-            return new
+            return (object)new
             {
                 kty = "EC",
                 crv = "P-256",
@@ -110,6 +114,17 @@ internal sealed class TestIdentityProvider : HttpMessageHandler, IHttpClientFact
                 use = "sig",
                 alg = "ES256",
             };
+        }).ToList();
+
+        var rsa = RsaKey.Rsa.ExportParameters(false);
+        keys.Add(new
+        {
+            kty = "RSA",
+            n = Base64UrlEncoder.Encode(rsa.Modulus),
+            e = Base64UrlEncoder.Encode(rsa.Exponent),
+            kid = RsaKey.KeyId,
+            use = "sig",
+            alg = "RS256",
         });
 
         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)

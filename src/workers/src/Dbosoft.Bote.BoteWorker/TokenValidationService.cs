@@ -68,8 +68,11 @@ public class TokenValidationService : ITokenValidationService
             RequireExpirationTime = true,
             RequireSignedTokens = true,
 
-            // CRITICAL: Restrict allowed algorithms to prevent algorithm confusion attacks
-            ValidAlgorithms = new[] { SecurityAlgorithms.EcdsaSha256 },
+            // CRITICAL: restrict to asymmetric signature algorithms to prevent algorithm-confusion attacks (e.g. a
+            // public key replayed as an HMAC secret). RS256 and ES256 are both asymmetric and the key type is matched
+            // to the algorithm, so accepting both is safe: a production issuer such as OpenIddict signs RS256, while
+            // the development BasicIdentityProvider signs ES256.
+            ValidAlgorithms = new[] { SecurityAlgorithms.RsaSha256, SecurityAlgorithms.EcdsaSha256 },
 
             // Reduce clock skew for tighter security (default is 5 minutes)
             ClockSkew = TimeSpan.FromMinutes(2)
