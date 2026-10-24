@@ -46,6 +46,20 @@ public class BoteQueuePolicyTests
             .Should().Be(new ClientSendRoute(ClientSendTarget.Self, "client-a"));
     }
 
+    [Fact]
+    public void Peers_survive_the_signalr_claim()
+    {
+        var formatted = BotePeers.Of(["client-c", "client-b"]).Format();
+
+        // SignalR hands the claim to the worker as an HTTP header
+        formatted.Should().NotContainAny("\r", "\n");
+        var peers = BotePeers.Parse(formatted);
+        peers.Allows("client-b").Should().BeTrue();
+        peers.Allows("client-c").Should().BeTrue();
+        peers.Allows("client-d").Should().BeFalse();
+        BotePeers.Parse(BotePeers.All.Format()).Allows("client-d").Should().BeTrue();
+    }
+
     [Theory]
     [InlineData("bote-clients-")]
     [InlineData("bote-clients-..")]

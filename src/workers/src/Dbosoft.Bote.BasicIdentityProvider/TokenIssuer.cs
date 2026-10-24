@@ -67,12 +67,14 @@ public class TokenIssuer(
 
         logger.LogInformation("Expected audience: {Audience}", options.Value.Authority);
 
-        // Validate client assertion: issuer must be client  ID, audience must be authority
+        // Validate client assertion: issuer must be client ID, audience must be authority, and the assertion must be
+        // explicitly typed (RFC 8725) as a client assertion — matching the production identity provider (OpenIddict).
         var assertionTokenResult = await handler.ValidateTokenAsync(assertionToken, new TokenValidationParameters()
         {
             ValidIssuer = clientId,
             ValidAudience = options.Value.Authority,
             IssuerSigningKey = clientKey,
+            ValidTypes = new[] { "client-authentication+jwt" },
         });
 
         if (!assertionTokenResult.IsValid)

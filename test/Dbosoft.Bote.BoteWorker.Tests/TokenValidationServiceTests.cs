@@ -18,6 +18,18 @@ public class TokenValidationServiceTests
     }
 
     [Fact]
+    public async Task Accepts_an_RS256_token_from_a_production_issuer()
+    {
+        // The production identity provider (OpenIddict) signs with RS256; the worker must accept it, not only the
+        // development BasicIdentityProvider's ES256.
+        var token = _idp.Issue(signingCredentials: new SigningCredentials(_idp.RsaKey, SecurityAlgorithms.RsaSha256));
+
+        var result = await _idp.CreateValidator().ValidateAccessToken(token);
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Rejects_a_token_of_another_issuer()
     {
         var result = await _idp.CreateValidator().ValidateAccessToken(_idp.Issue(issuer: "https://evil.test/api"));
