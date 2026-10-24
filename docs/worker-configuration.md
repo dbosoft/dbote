@@ -81,7 +81,7 @@ as a Key Vault reference, which SignalR resolves with its own identity.
 | `RequiredScope` | yes | A scope every token must carry (scopes are a space-separated set); without it the worker refuses every client. |
 | `PeerScope` | no | A client whose token carries this scope too may send to the clients of its tenant its token lists in `bote_peers`, e.g. `bote.peer`. Unset, clients only talk to the cloud. |
 
-The worker takes the client from `sub` and the tenant from `tid`. It accepts ES256 tokens only,
+The worker takes the client from `sub` and the tenant from `tid`. It accepts RS256 and ES256 tokens only,
 reloads the keys when a token names an unknown key (at most every 30 seconds) and keeps using the
 known keys while the issuer is unreachable. Tenant and client ids must not contain `/`, `\` or
 control characters, nor be `.` or `..`. `BasicIdentityProvider` is for development; an application
