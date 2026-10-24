@@ -48,12 +48,13 @@ public sealed class BotePeers
     public bool Allows(string clientId) => _everyone || _clientIds.Contains(clientId);
 
     /// <summary>
-    /// One string for a claim of the worker's own SignalR token; the ids are separated by line
-    /// breaks, which no client id contains.
+    /// One string for a claim of the worker's own SignalR token; the ids are separated by
+    /// <c>/</c>, which no client id contains. SignalR hands the claims to the worker as HTTP
+    /// headers, so the value must not contain line breaks.
     /// </summary>
-    public string Format() => _everyone ? Everyone : string.Join('\n', _clientIds.Order(StringComparer.Ordinal));
+    public string Format() => _everyone ? Everyone : string.Join('/', _clientIds.Order(StringComparer.Ordinal));
 
     /// <summary>Reads what <see cref="Format"/> wrote; nothing is none.</summary>
     public static BotePeers Parse(string? value) =>
-        string.IsNullOrEmpty(value) ? None : Of(value.Split('\n'));
+        string.IsNullOrEmpty(value) ? None : Of(value.Split('/'));
 }
