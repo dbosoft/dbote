@@ -9,6 +9,11 @@ public static class BoteStorageConstants
     public const string Outbox = "bote-outbox";
 
     /// <summary>
+    /// The queue of the gateway storage Event Grid reports the blobs written to the outbox to.
+    /// </summary>
+    public const string OutboxCreatedQueue = "bote-outbox-created";
+
+    /// <summary>
     /// Blob metadata keys used for attachment tracking and validation.
     /// </summary>
     public static class Metadata
