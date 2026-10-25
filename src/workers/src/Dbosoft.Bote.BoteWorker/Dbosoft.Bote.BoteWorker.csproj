@@ -34,6 +34,29 @@
     <ProjectReference Include="..\..\..\Dbosoft.Bote.Primitives\Dbosoft.Bote.Primitives.csproj" />
     <ProjectReference Include="..\..\..\Dbosoft.Bote.Rebus.Integration\Dbosoft.Bote.Rebus.Integration.csproj" />
   </ItemGroup>
+  <!--
+    The blob extension the Functions host loads is the one the worker package names: 6.8.2 names
+    5.3.8, whose container scan finds only blobs written before the host's first poll, so attachments
+    from the cloud reach a client only after a restart (Azure/azure-sdk-for-net#61660, fixed in
+    5.3.10). No worker package names 5.3.10 yet and the SDK takes no override, so the generated
+    extension project is pointed at it here. The build fails once the worker package names another
+    version: then this target is to go.
+  -->
+  <PropertyGroup>
+    <_BlobsExtensionNamed>5.3.8</_BlobsExtensionNamed>
+    <_BlobsExtensionFixed>5.3.10</_BlobsExtensionFixed>
+  </PropertyGroup>
+  <Target Name="_PinFixedBlobsExtension" AfterTargets="_FunctionsGenerateCommon" Condition="'$(_FunctionsBuildEnabled)' == 'true'">
+    <PropertyGroup>
+      <_NamedBlobsReference>&lt;PackageReference Include="Microsoft.Azure.WebJobs.Extensions.Storage.Blobs" Version="$(_BlobsExtensionNamed)" /&gt;</_NamedBlobsReference>
+      <_FixedBlobsReference>&lt;PackageReference Include="Microsoft.Azure.WebJobs.Extensions.Storage.Blobs" Version="$(_BlobsExtensionFixed)" /&gt;</_FixedBlobsReference>
+      <_ExtensionsProject>$([System.IO.File]::ReadAllText($(ExtensionsCsProj)))</_ExtensionsProject>
+    </PropertyGroup>
+    <Error Condition="!$(_ExtensionsProject.Contains($(_NamedBlobsReference))) AND !$(_ExtensionsProject.Contains($(_FixedBlobsReference)))"
+           Text="The worker package no longer names blob extension $(_BlobsExtensionNamed); remove _PinFixedBlobsExtension." />
+    <WriteLinesToFile Condition="$(_ExtensionsProject.Contains($(_NamedBlobsReference)))" File="$(ExtensionsCsProj)"
+                      Lines="$([MSBuild]::Escape($(_ExtensionsProject.Replace($(_NamedBlobsReference), $(_FixedBlobsReference)))))" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
   <ItemGroup>
     <InternalsVisibleTo Include="Dbosoft.Bote.Rebus.IntegrationTests" />
     <InternalsVisibleTo Include="Dbosoft.Bote.BoteWorker.Tests" />
