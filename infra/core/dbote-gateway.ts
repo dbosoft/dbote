@@ -287,7 +287,7 @@ export class DboteGateway extends Construct {
         // with it, and Storage Queues have no user delegation SAS.
         worker.addAppSetting('dbote__Worker__Storage__Connection', storageAccount.primaryConnectionString);
         // Event Grid carries the outbox here; the blob trigger is for storages without it (Azurite).
-        worker.addAppSetting('AzureWebJobs__CloudOutboxBlobDetected__Disabled', 'true');
+        worker.addAppSetting('AzureWebJobs.CloudOutboxBlobDetected.Disabled', 'true');
         worker.addAppSetting('dbote__Worker__ServiceBus__Connection__fullyQualifiedNamespace', this.fullyQualifiedNamespace);
         worker.addAppSetting('dbote__Worker__ServiceBus__Connection__credential', 'managedidentity');
         worker.addAppSetting('dbote__Worker__ServiceBus__Connection__clientId', worker.identityClientId);

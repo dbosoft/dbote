@@ -59,7 +59,7 @@ internal class DataBusCopyFile(
 
     /// <summary>
     /// The same for a storage without Event Grid, as Azurite is in development. Turned off in Azure
-    /// (AzureWebJobs.CloudOutboxBlobDetected.Disabled), where both would copy every attachment.
+    /// (AzureWebJobs.CloudOutboxBlobDetected.Disabled; the form with __ does not turn it off), where both would copy every attachment.
     /// </summary>
     [PublicAPI]
     [Function("CloudOutboxBlobDetected")]
