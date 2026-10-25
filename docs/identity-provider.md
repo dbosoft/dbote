@@ -49,7 +49,7 @@ The client assertion is signed with ES256 by the client's own ECDSA P-256 key an
 | `aud` | `BoteCredentials.Authority`, the issuer's identifier (not the token endpoint URL) |
 | `jti` | a new GUID for every assertion |
 | `nbf`, `exp` | now, and five minutes later |
-| header `kid` | the key id of the client's signing key |
+| header `kid` | the key id of the client's signing key: `Authentication:KeyId` when configured, otherwise the key's JWK thumbprint (RFC 7638, SHA-256, base64url) |
 | header `typ` | `client-authentication+jwt` (explicit typing, RFC 8725; the identity provider requires it) |
 
 The identity provider must:
@@ -65,7 +65,8 @@ The identity provider must:
   tenant (`/{tenant}/token`) is fine as long as the client must be registered under that tenant.
 
 Rotating a client's key: register the new public key next to the old one and tell them apart by
-`kid`, then remove the old one when the client has switched.
+`kid`, then remove the old one when the client has switched. Whoever registers a key can name it
+without being told: its thumbprint is what the client signs with unless configured otherwise.
 
 ## Access token
 

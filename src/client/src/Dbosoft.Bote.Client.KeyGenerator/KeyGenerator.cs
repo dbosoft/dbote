@@ -9,12 +9,11 @@ public class KeyGenerator
 {
     public KeyInfo GenerateKey()
     {
-        var keyId = Guid.NewGuid().ToString();
         using var key = ECDsa.Create(ECCurve.CreateFromFriendlyName("secp256r1"));
-        var securityKey = new ECDsaSecurityKey(key)
-        {
-            KeyId = keyId,
-        };
+        var securityKey = new ECDsaSecurityKey(key);
+        // The id the client signs with when none is configured: the key's thumbprint.
+        var keyId = Base64UrlEncoder.Encode(JsonWebKeyConverter.ConvertFromECDsaSecurityKey(securityKey).ComputeJwkThumbprint());
+        securityKey.KeyId = keyId;
 
         var jwk = JsonWebKeyConverter.ConvertFromECDsaSecurityKey(securityKey);
         var publicJwkJson = (string)typeof(JsonWebKey)
