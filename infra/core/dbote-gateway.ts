@@ -7,6 +7,9 @@ import { RoleAssignment } from "@cdktf/provider-azurerm/lib/role-assignment";
 import { StorageContainer } from "@cdktf/provider-azurerm/lib/storage-container";
 import { StorageTable } from "@cdktf/provider-azurerm/lib/storage-table";
 import { StorageManagementPolicy } from "@cdktf/provider-azurerm/lib/storage-management-policy";
+import { StorageQueue } from "@cdktf/provider-azurerm/lib/storage-queue";
+import { EventgridSystemTopic } from "@cdktf/provider-azurerm/lib/eventgrid-system-topic";
+import { EventgridSystemTopicEventSubscription } from "@cdktf/provider-azurerm/lib/eventgrid-system-topic-event-subscription";
 import { Environnment } from "./environment";
 import { DboteContainerRegistry, DboteWorker } from "./dbote-worker";
 
@@ -172,7 +175,7 @@ export class DboteGateway extends Construct {
             accountReplicationType: "LRS",
         });
         this.storageAccount = storageAccount;
-        // The worker's CloudOutboxBlobDetected trigger watches bote-outbox in this account.
+        // The cloud stages its attachments in bote-outbox of this account.
         this.dataBusOutboxStorageAccount = storageAccount;
 
         // DataBus staging containers. The worker's outbox blob trigger needs its container up
@@ -183,6 +186,29 @@ export class DboteGateway extends Construct {
                 storageAccountId: storageAccount.id,
             });
         }
+
+        // Event Grid reports every blob written to the outbox to a queue, which starts its copy to
+        // the clients (the worker's CloudOutboxBlobCreated). The blob trigger's polling scan misses
+        // blobs: extension 5.3.8 finds only those written before the host's first poll.
+        const outboxCreated = new StorageQueue(this, environment.formatName('stq', 'bote-outbox-created'), {
+            name: 'bote-outbox-created',
+            storageAccountId: storageAccount.id,
+        });
+        const storageEvents = new EventgridSystemTopic(this, environment.formatName('evgt', 'st'), {
+            name: environment.formatName('evgt', 'st'),
+            location: environment.location,
+            resourceGroupName: environment.resourceGroup,
+            sourceResourceId: storageAccount.id,
+            topicType: 'Microsoft.Storage.StorageAccounts',
+        });
+        new EventgridSystemTopicEventSubscription(this, environment.formatName('evgs', 'bote-outbox-created'), {
+            name: 'bote-outbox-created',
+            systemTopic: storageEvents.name,
+            resourceGroupName: environment.resourceGroup,
+            includedEventTypes: ['Microsoft.Storage.BlobCreated'],
+            subjectFilter: { subjectBeginsWith: '/blobServices/default/containers/bote-outbox/blobs/' },
+            storageQueueEndpoint: { storageAccountId: storageAccount.id, queueName: outboxCreated.name },
+        });
 
         // Topic subscriptions of the clients
         new StorageTable(this, environment.formatName('stt', 'subscriptions'), {
@@ -260,6 +286,8 @@ export class DboteGateway extends Construct {
         // A connection string with the account key: the worker signs the SAS URIs for the clients
         // with it, and Storage Queues have no user delegation SAS.
         worker.addAppSetting('dbote__Worker__Storage__Connection', storageAccount.primaryConnectionString);
+        // Event Grid carries the outbox here; the blob trigger is for storages without it (Azurite).
+        worker.addAppSetting('AzureWebJobs.CloudOutboxBlobDetected.Disabled', 'true');
         worker.addAppSetting('dbote__Worker__ServiceBus__Connection__fullyQualifiedNamespace', this.fullyQualifiedNamespace);
         worker.addAppSetting('dbote__Worker__ServiceBus__Connection__credential', 'managedidentity');
         worker.addAppSetting('dbote__Worker__ServiceBus__Connection__clientId', worker.identityClientId);

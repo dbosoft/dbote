@@ -1,7 +1,8 @@
-﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
 using Dbosoft.Bote.BoteWorker.Extensions;
 using Dbosoft.Bote.BoteWorker.Services;
+using Dbosoft.Bote.Primitives;
 using JetBrains.Annotations;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
@@ -31,20 +32,46 @@ public class DataBusCopyRequest
 internal class DataBusCopyFile(
     ILogger<DataBusCopyFile> logger,
     DataBusCopyProcessor copyProcessor,
-    ITenantStorageResolver tenantStorageResolver)
+    ITenantStorageResolver tenantStorageResolver,
+    BlobServiceClient outbox)
 {
 
     /// <summary>
-    /// Blob trigger for cloud outbox - starts copy from cloud outbox to client
-    /// Initiates the Cloud → client copy flow.
+    /// A blob the cloud put into its outbox, as Event Grid reports it: starts its copy to where the
+    /// clients of its tenant read it. Event Grid, not the blob trigger below, is what Azure runs on:
+    /// the polling scan of the blob extension misses blobs (extension 5.3.8 finds only those written
+    /// before the host's first poll), and a message to a client waits for its attachment.
     /// </summary>
+    [PublicAPI]
+    [Function("CloudOutboxBlobCreated")]
+    public async Task CloudOutboxBlobCreated(
+        [QueueTrigger(BoteStorageConstants.OutboxCreatedQueue, Connection = "dbote:Worker:Storage:Connection")] string message)
+    {
+        if (!OutboxEvents.TryRead(message, out var tenantId, out var attachmentId))
+        {
+            logger.LogWarning("An outbox event that names no attachment of the outbox: {Message}", message);
+            return;
+        }
+
+        await CopyToClients(outbox.GetBlobContainerClient(BoteStorageConstants.Outbox)
+            .GetBlobClient($"{tenantId}/{attachmentId}"), tenantId, attachmentId);
+    }
+
+    /// <summary>
+    /// The same for a storage without Event Grid, as Azurite is in development. Turned off in Azure
+    /// (AzureWebJobs.CloudOutboxBlobDetected.Disabled; the form with __ does not turn it off), where both would copy every attachment.
+    /// </summary>
+    [PublicAPI]
     [Function("CloudOutboxBlobDetected")]
-    public async Task CloudOutboxBlobDetected(
+    public Task CloudOutboxBlobDetected(
         // The outbox lives in the gateway storage next to the inbox, not in the Functions host
         // storage (AzureWebJobsStorage), so the cloud only needs access to one account.
         [BlobTrigger("bote-outbox/{tenantId}/{attachmentId}", Connection = "dbote:Worker:Storage:Connection")] BlobClient sourceBlob,
         string tenantId,
-        string attachmentId)
+        string attachmentId) =>
+        CopyToClients(sourceBlob, tenantId, attachmentId);
+
+    private async Task CopyToClients(BlobClient sourceBlob, string tenantId, string attachmentId)
     {
         logger.LogInformation("Cloud outbox blob detected: {TenantId}/{AttachmentId}", tenantId, attachmentId);
 
@@ -78,8 +105,6 @@ internal class DataBusCopyFile(
         };
 
         await copyProcessor.TryProcessCopyAsync(copyRequest);
-
-
     }
 
     /// <summary>
